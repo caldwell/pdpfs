@@ -7,7 +7,7 @@ use block::{BlockDevice, PhysicalBlockDevice};
 use block::imd::IMD;
 use block::img::IMG;
 use block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
-use fs::{RT11FS, EntryKind};
+use fs::RT11FS;
 
 use anyhow::{anyhow, Context};
 use docopt::Docopt;
@@ -61,31 +61,20 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
         };
         let source_file = args.arg_image_file.to_str().ok_or(anyhow!("Bad filename: {}", args.arg_image_file.to_string_lossy()))?
             .to_uppercase();
-        for s in fs.dir.iter() {
-            let mut block_offset = 0usize;
-            for f in s.entries.iter() {
-                if f.kind != EntryKind::Permanent || f.name != source_file {
-                    block_offset += f.length;
-                    continue;
-                }
-                print!("{} -> {}", f.name, local_dest.to_string_lossy());
-                let data = fs.image.block(s.data_block as usize + block_offset, f.length)?;
-                std::fs::write(local_dest, data.as_bytes())?;
-                print!("... Successfully copied {} blocks ({} bytes)\n", f.length, f.length * block::BLOCK_SIZE);
-                return Ok(())
-            }
-        }
-        return Err(anyhow!("File not found: {}", source_file));
+        let Some(file) = fs.file_named(&source_file) else {
+            return Err(anyhow!("File not found: {}", source_file));
+        };
+        print!("{} -> {}", file.name, local_dest.to_string_lossy());
+        let data = fs.image.block(file.block, file.length)?;
+        std::fs::write(local_dest, data.as_bytes())?;
+        print!("... Successfully copied {} blocks ({} bytes)\n", file.length, file.length * block::BLOCK_SIZE);
     }
 
     Ok(())
 }
 
 fn ls<B: BlockDevice>(fs: &RT11FS<B>) {
-    for s in fs.dir.iter() {
-        for f in s.entries.iter() {
-            if f.kind != EntryKind::Permanent { continue }
-            println!("{:10} {:>3}:{:<3} {:6} {}", f.creation_date.map(|d| d.to_string()).unwrap_or("<no-date>".to_string()), f.job, f.channel, f.length, f.name);
-        }
+    for f in fs.file_iter() {
+        println!("{:10} {:>3}:{:<3} {:6} {}", f.creation_date.map(|d| d.to_string()).unwrap_or("<no-date>".to_string()), f.job, f.channel, f.length, f.name);
     }
 }

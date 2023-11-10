@@ -140,6 +140,22 @@ impl<B: BlockDevice> RT11FS<B> {
         }
         Ok(segments)
     }
+
+    pub fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, B> {
+        DirEntryIterator {
+            fs: self,
+            segment: 0,
+            entry: 0,
+        }
+    }
+
+    pub fn file_iter<'a>(&'a self) -> impl Iterator<Item = &'a DirEntry> + 'a {
+        self.dir_iter().filter(|e| e.kind == EntryKind::Permanent)
+    }
+
+    pub fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
+        self.file_iter().find(|f| f.name == name)
+    }
 }
 
 const STATUS_E_TENT: u16 = 0o000400;
@@ -182,4 +198,24 @@ pub enum EntryKind {
     Tentative,
     Empty,
     Permanent,
+}
+
+pub struct DirEntryIterator<'a, B: BlockDevice> {
+    fs: &'a RT11FS<B>,
+    segment: usize,
+    entry: usize,
+}
+
+impl<'a, B: BlockDevice> Iterator for DirEntryIterator<'a, B> {
+    type Item = &'a DirEntry;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.segment >= self.fs.dir.len() { return None }
+        let entry = &self.fs.dir[self.segment].entries[self.entry];
+        self.entry += 1;
+        if self.entry >= self.fs.dir[self.segment].entries.len() {
+            self.segment += 1;
+            self.entry = 0;
+        }
+        Some(entry)
+    }
 }
