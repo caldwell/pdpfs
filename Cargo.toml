@@ -8,3 +8,10 @@ name="rt11fs"
 path="rt11fs.rs"
 
 [dependencies]
+radix50 = "0.1"
+bytebuffer = "2"
+anyhow = "1.0"
+pretty-hex = "0.3"
+chrono = "0.4"
+docopt = "1"
+serde = "1"
