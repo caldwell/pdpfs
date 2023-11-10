@@ -156,6 +156,14 @@ impl<B: BlockDevice> RT11FS<B> {
     pub fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
         self.file_iter().find(|f| f.name == name)
     }
+
+    pub fn free_blocks(&self) -> usize {
+        self.dir_iter().filter(|e| e.kind == EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+    }
+
+    pub fn used_blocks(&self) -> usize {
+        self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+    }
 }
 
 const STATUS_E_TENT: u16 = 0o000400;

@@ -13,6 +13,8 @@ use anyhow::{anyhow, Context};
 use docopt::Docopt;
 use serde::Deserialize;
 
+use crate::block::BLOCK_SIZE;
+
 const USAGE: &'static str = "
 Usage:
   rt11fs -h
@@ -82,6 +84,12 @@ fn ls<B: BlockDevice>(fs: &RT11FS<B>) {
     for f in fs.file_iter() {
         println!("{:10} {:>3}:{:<3} {:6} {}", f.creation_date.map(|d| d.to_string()).unwrap_or("<no-date>".to_string()), f.job, f.channel, f.length, f.name);
     }
+    let free_blocks = fs.free_blocks();
+    let used_blocks = fs.used_blocks();
+    println!("\nUsed  {:4} blocks {:7} bytes {:3}%\nFree  {:4} blocks {:7} bytes {:3}%\nTotal {:4} blocks {:7} bytes",
+             used_blocks, used_blocks * BLOCK_SIZE, used_blocks * 100 / (used_blocks + free_blocks),
+             free_blocks, free_blocks * BLOCK_SIZE, free_blocks * 100 / (used_blocks + free_blocks),
+             used_blocks + free_blocks, (used_blocks + free_blocks) * BLOCK_SIZE);
 }
 
 fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
