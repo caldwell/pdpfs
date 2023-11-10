@@ -17,6 +17,7 @@ const USAGE: &'static str = "
 Usage:
   rt11fs -h
   rt11fs [-h] -i <image> ls
+  rt11fs [-h] -i <image> cp <image-file> <local-destination>
 
 Options:
   -h --help              Show this screen.
@@ -26,6 +27,9 @@ Options:
 struct Args {
     flag_image:       PathBuf,
     cmd_ls:           bool,
+    cmd_cp:           bool,
+    arg_image_file:   PathBuf,
+    arg_local_destination: PathBuf,
 }
 fn main() -> anyhow::Result<()> {
     let args: Args = Docopt::new(USAGE)
@@ -46,6 +50,32 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
 
     if args.cmd_ls {
         ls(&fs);
+    }
+
+    if args.cmd_cp {
+        let metadata = std::fs::metadata(&args.arg_local_destination)?;
+        let local_dest = if metadata.is_dir() {
+            args.arg_local_destination.join(args.arg_image_file.file_name().ok_or(anyhow!("Bad filename: {}", args.arg_image_file.to_string_lossy()))?)
+        } else {
+            args.arg_local_destination.clone()
+        };
+        let source_file = args.arg_image_file.to_str().ok_or(anyhow!("Bad filename: {}", args.arg_image_file.to_string_lossy()))?
+            .to_uppercase();
+        for s in fs.dir.iter() {
+            let mut block_offset = 0usize;
+            for f in s.entries.iter() {
+                if f.kind != EntryKind::Permanent || f.name != source_file {
+                    block_offset += f.length;
+                    continue;
+                }
+                print!("{} -> {}", f.name, local_dest.to_string_lossy());
+                let data = fs.image.block(s.data_block as usize + block_offset, f.length)?;
+                std::fs::write(local_dest, data.as_bytes())?;
+                print!("... Successfully copied {} blocks ({} bytes)\n", f.length, f.length * block::BLOCK_SIZE);
+                return Ok(())
+            }
+        }
+        return Err(anyhow!("File not found: {}", source_file));
     }
 
     Ok(())
