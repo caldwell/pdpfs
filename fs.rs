@@ -85,15 +85,18 @@ impl<B: BlockDevice> RT11FS<B> {
             let mut buf = image.block(segment as usize, 2)?;
             buf.set_endian(Endian::LittleEndian);
             let extra_bytes;
+            let data_block;
             let next = DirSegment {
                 segments: buf.read_u16()?,
                 next_segment: buf.read_u16()?,
                 last_segment: buf.read_u16()?,
                 extra_bytes: { extra_bytes = buf.read_u16()?; extra_bytes },
-                data_block: buf.read_u16()?,
+                data_block: { data_block = buf.read_u16()?; data_block },
                 entries: {
                     let mut entries = vec![];
+                    let mut block = data_block as usize;
                     while let Ok(status) = buf.read_u16() {
+                        let length;
                         entries.push(DirEntry {
                             kind: match status {
                                 status if status & STATUS_E_EOS  != 0 => break, // end of segment marker
@@ -110,7 +113,7 @@ impl<B: BlockDevice> RT11FS<B> {
                                 let (name, ext) = raw.split_at(6);
                                 format!("{}.{}", name.trim(), ext.trim())
                             },
-                            length: buf.read_u16()? as usize,
+                            length: { length = buf.read_u16()? as usize; length },
                             job: buf.read_u8()?,
                             channel: buf.read_u8()?,
                             creation_date: {
@@ -123,7 +126,11 @@ impl<B: BlockDevice> RT11FS<B> {
                                 else { Some(chrono::NaiveDate::from_ymd_opt(1972 + year + age * 32, month, day).ok_or(anyhow!("Invalid date: {:04}-{:02}-{:02} [{}/{:#06x}/{:#018b}]", year, month, day, raw, raw, raw))?) }
                             },
                             extra: (0..extra_bytes).map(|_| -> anyhow::Result<u16> { Ok(buf.read_u16()?) }).collect::<anyhow::Result<Vec<u16>>>()?,
+
+                            // Pre-compute block addresses of files for convenience
+                            block,
                         });
+                        block += length;
                     }
                     entries
                 },
@@ -165,6 +172,9 @@ pub struct DirEntry {
     pub channel: u8,
     pub creation_date: Option<NaiveDate>,
     pub extra: Vec<u16>,
+
+    // Not part of the on-disk structure. Precalculated for convenience.
+    pub block: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
