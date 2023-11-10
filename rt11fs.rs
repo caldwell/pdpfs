@@ -9,7 +9,7 @@ use block::img::IMG;
 use block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
 use fs::{RT11FS, EntryKind};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use docopt::Docopt;
 use serde::Deserialize;
 
@@ -53,11 +53,11 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
     }
 
     if args.cmd_cp {
-        let metadata = std::fs::metadata(&args.arg_local_destination)?;
-        let local_dest = if metadata.is_dir() {
-            args.arg_local_destination.join(args.arg_image_file.file_name().ok_or(anyhow!("Bad filename: {}", args.arg_image_file.to_string_lossy()))?)
-        } else {
-            args.arg_local_destination.clone()
+        let local_dest = match (args.arg_local_destination.exists(), std::fs::metadata(&args.arg_local_destination)) {
+            (true, Ok(m)) if m.is_dir() => args.arg_local_destination.join(args.arg_image_file.file_name()
+                                                                               .ok_or(anyhow!("Bad filename: {}", args.arg_image_file.to_string_lossy()))?),
+            (true, Err(e)) => Err(e).with_context(|| format!("{}", args.arg_local_destination.to_string_lossy()))?,
+            (_, _) => args.arg_local_destination.clone(),
         };
         let source_file = args.arg_image_file.to_str().ok_or(anyhow!("Bad filename: {}", args.arg_image_file.to_string_lossy()))?
             .to_uppercase();
