@@ -11,6 +11,7 @@ use fs::RT11FS;
 
 use anyhow::{anyhow, Context};
 use docopt::Docopt;
+use pretty_hex::PrettyHex;
 use serde::Deserialize;
 
 use crate::block::BLOCK_SIZE;
@@ -20,6 +21,7 @@ Usage:
   rt11fs -h
   rt11fs [-h] -i <image> ls
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
+  rt11fs [-h] -i <image> dump [--sector]
 
 Options:
   -h --help              Show this screen.
@@ -37,12 +39,19 @@ Options:
 
      # This copies 'FILE.TXT' from the disk image into /tmp/FILE.TXT on the local machine:
      rt11fs -i my_image.img cp FILE.TXT /tmp
+
+ dump:
+   -s --sector            Dump by blocks instead of sectors
+
+   Dumps the image, de-interleaving floppy images.
 ";
 #[derive(Debug, Deserialize)]
 struct Args {
     flag_image:       PathBuf,
+    flag_sector:      bool,
     cmd_ls:           bool,
     cmd_cp:           bool,
+    cmd_dump:         bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
 }
@@ -61,7 +70,14 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Result<()> {
-    let fs = RT11FS::new(RX(dev))?;
+    let rx = RX(dev);
+
+    if args.cmd_dump {
+        dump(&rx, args.flag_sector)?;
+        return Ok(())
+    }
+
+    let mut fs = RT11FS::new(rx)?;
 
     if args.cmd_ls {
         ls(&fs);
@@ -112,4 +128,17 @@ fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> any
 
 fn cp_into_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
     todo!()
+}
+
+fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
+    if by_sector {
+        for s in 0..image.sectors() {
+            println!("Sector {}\n{:?}", s, image.sector(s)?.hex_dump());
+        }
+    } else {
+        for b in 0..image.blocks() {
+            println!("Block {}\n{:?}", b, image.block(b, 1)?.as_bytes().hex_dump());
+        }
+    }
+    Ok(())
 }
