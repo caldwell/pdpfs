@@ -21,8 +21,12 @@ pub trait BlockDevice {
         Ok(ByteBuffer::from_bytes(&buf))
     }
 
+    fn blocks(&self) -> usize {
+        self.sectors() * self.sector_size() / BLOCK_SIZE
+    }
     fn sector(&self, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn sector_size(&self) -> usize;
+    fn sectors(&self) -> usize;
 }
 
 pub trait PhysicalBlockDevice {
