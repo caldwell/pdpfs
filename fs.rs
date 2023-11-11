@@ -1,7 +1,7 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
 use anyhow::{Context,anyhow};
-use bytebuffer::Endian;
+use bytebuffer::{Endian, ByteBuffer};
 use chrono::NaiveDate;
 
 use crate::block::BlockDevice;
@@ -82,52 +82,7 @@ impl<B: BlockDevice> RT11FS<B> {
         let mut segments = vec![];
         let mut segment = home.directory_start_block;
         while segment != 0 {
-            let mut buf = image.block(segment as usize, 2)?;
-            buf.set_endian(Endian::LittleEndian);
-            let extra_bytes;
-            let data_block;
-            let next = DirSegment {
-                block: segment,
-                segments: buf.read_u16()?,
-                next_segment: buf.read_u16()?,
-                last_segment: buf.read_u16()?,
-                extra_bytes: { extra_bytes = buf.read_u16()?; extra_bytes },
-                data_block: { data_block = buf.read_u16()?; data_block },
-                entries: {
-                    let mut entries = vec![];
-                    let mut block = data_block as usize;
-                    while let Ok(status) = buf.read_u16() {
-                        let length;
-                        entries.push(DirEntry {
-                            kind: match status {
-                                status if status & STATUS_E_EOS  != 0 => break, // end of segment marker
-                                status if status & STATUS_E_TENT != 0 => EntryKind::Tentative,
-                                status if status & STATUS_E_MPTY != 0 => EntryKind::Empty,
-                                status if status & STATUS_E_PERM != 0 => EntryKind::Permanent,
-                                status => Err(anyhow!("Bad status {:06o}", status))?,
-                            },
-                            read_only: status & STATUS_E_READ != 0,
-                            protected: status & STATUS_E_PROT != 0,
-                            prefix_block: status & STATUS_E_PRE != 0,
-                            name: {
-                                let raw = radix50::pdp11::decode(&[buf.read_u16()?, buf.read_u16()?, buf.read_u16()?]);
-                                let (name, ext) = raw.split_at(6);
-                                format!("{}.{}", name.trim(), ext.trim())
-                            },
-                            length: { length = buf.read_u16()? as usize; length },
-                            job: buf.read_u8()?,
-                            channel: buf.read_u8()?,
-                            creation_date: DirEntry::decode_date(buf.read_u16()?)?,
-                            extra: (0..extra_bytes).map(|_| -> anyhow::Result<u16> { Ok(buf.read_u16()?) }).collect::<anyhow::Result<Vec<u16>>>()?,
-
-                            // Pre-compute block addresses of files for convenience
-                            block,
-                        });
-                        block += length;
-                    }
-                    entries
-                },
-            };
+            let next = DirSegment::from_repr(segment, image.block(segment as usize, 2)?)?;
             segment = next.next_segment;
             segments.push(next);
         }
@@ -180,6 +135,33 @@ pub struct DirSegment {
     pub block: u16, // The block number of _this_ segment
 }
 
+impl DirSegment {
+    pub fn from_repr(my_block: u16, mut buf: ByteBuffer) -> anyhow::Result<DirSegment> {
+        buf.set_endian(Endian::LittleEndian);
+        let extra_bytes;
+        let data_block;
+        Ok(DirSegment {
+            block: my_block,
+            segments: buf.read_u16()?,
+            next_segment: buf.read_u16()?,
+            last_segment: buf.read_u16()?,
+            extra_bytes: { extra_bytes = buf.read_u16()?;
+                           if extra_bytes & 1 == 1 { return Err(anyhow!("Image has odd number of extra bytes: {}", extra_bytes)) }
+                           extra_bytes },
+            data_block: { data_block = buf.read_u16()?; data_block },
+            entries: {
+                let mut entries = vec![];
+                let mut block = data_block as usize;
+                while let Some(entry) = DirEntry::from_repr(block, extra_bytes, &mut buf)? {
+                    block += entry.length;
+                    entries.push(entry);
+                }
+                entries
+            },
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DirEntry {
     pub kind: EntryKind,
@@ -205,6 +187,36 @@ pub enum EntryKind {
 }
 
 impl DirEntry {
+    pub fn from_repr(data_block: usize, extra_bytes: u16, buf: &mut ByteBuffer) -> anyhow::Result<Option<DirEntry>> {
+        let status = buf.read_u16()?;
+        let length;
+        Ok(Some(DirEntry {
+            kind: match status {
+                status if status & STATUS_E_EOS  != 0 => return Ok(None), // end of segment marker
+                status if status & STATUS_E_TENT != 0 => EntryKind::Tentative,
+                status if status & STATUS_E_MPTY != 0 => EntryKind::Empty,
+                status if status & STATUS_E_PERM != 0 => EntryKind::Permanent,
+                status => Err(anyhow!("Bad status {:06o}", status))?,
+            },
+            read_only: status & STATUS_E_READ != 0,
+            protected: status & STATUS_E_PROT != 0,
+            prefix_block: status & STATUS_E_PRE != 0,
+            name: {
+                let raw = radix50::pdp11::decode(&[buf.read_u16()?, buf.read_u16()?, buf.read_u16()?]);
+                let (name, ext) = raw.split_at(6);
+                format!("{}.{}", name.trim(), ext.trim())
+            },
+            length: { length = buf.read_u16()? as usize; length },
+            job: buf.read_u8()?,
+            channel: buf.read_u8()?,
+            creation_date: DirEntry::decode_date(buf.read_u16()?)?,
+            extra: (0..extra_bytes/2).map(|_| -> anyhow::Result<u16> { Ok(buf.read_u16()?) }).collect::<anyhow::Result<Vec<u16>>>()?,
+
+            // Pre-compute block addresses of files for convenience
+            block: data_block,
+        }))
+    }
+
     pub fn decode_date(raw: u16) -> anyhow::Result<Option<NaiveDate>> {
         let (age, month, day, year) = (((raw & 0b11_0000_00000_00000) >> 14) as i32,
                                        ((raw & 0b00_1111_00000_00000) >> 10) as u32,
