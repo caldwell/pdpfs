@@ -5,6 +5,8 @@
 mod block;
 mod fs;
 
+use std::fs::rename;
+use std::io::Write;
 use std::path::{PathBuf, Path};
 
 use block::{BlockDevice, PhysicalBlockDevice};
@@ -91,7 +93,8 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
         match (args.arg_source_file.components().count() > 1,
                args.arg_dest_file.components().count() > 1) {
             (false, true)  => cp_from_image(&fs, &args.arg_source_file, &args.arg_dest_file)?,
-            (true,  false) => cp_into_image(&fs, &args.arg_source_file, &args.arg_dest_file)?,
+            (true,  false) => { cp_into_image(&mut fs, &args.arg_source_file, &args.arg_dest_file)?;
+                                save_image(fs.image.physical_device(), &args.flag_image)? },
             (false, false) => Err(anyhow!("Image to image copy is not supported yet."))?,
             (true,  true)  => Err(anyhow!("Either the source or destination file needs to be on the image"))?,
         }
@@ -130,8 +133,24 @@ fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> any
     Ok(())
 }
 
-fn cp_into_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
-    todo!()
+fn cp_into_image<B: BlockDevice>(fs: &mut RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
+    let m = src.metadata()?;
+    let mut fh = fs.create(&dest.to_str().ok_or(anyhow!("Bad filename: {}", dest.to_string_lossy()))?
+                               .to_uppercase(),
+                           m.len() as usize)?;
+    let buf = std::fs::read(src)?;
+    fh.write(&buf)?;
+    Ok(())
+}
+
+fn save_image<P: PhysicalBlockDevice>(dev: &P, filename: &Path) -> anyhow::Result<()> {
+    let new_image = dev.as_vec();
+    let newname = filename.append(".new");
+    let bakname = filename.append(".bak");
+    std::fs::write(&newname, &new_image).with_context(|| format!("{}", newname.to_string_lossy()))?;
+    rename(filename, &bakname)?;
+    rename(&newname, filename)?;
+    Ok(())
 }
 
 fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
@@ -145,4 +164,19 @@ fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+// Stolen^H^H^H^H^H^H Adapted from https://internals.rust-lang.org/t/pathbuf-has-set-extension-but-no-add-extension-cannot-cleanly-turn-tar-to-tar-gz/14187/10
+// WHY ISN"T THIS IN STDLIB?!?!?!?!?!?!???!?!111
+use std::ffi::{OsString, OsStr};
+trait Append {
+    fn append(&self, ext: impl AsRef<OsStr>) -> PathBuf;
+}
+
+impl Append for Path {
+    fn append(&self, ext: impl AsRef<OsStr>) -> PathBuf {
+        let mut os_string: OsString = self.to_owned().into();
+        os_string.push(ext.as_ref());
+        os_string.into()
+    }
 }

@@ -1,10 +1,12 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
+use std::{cmp::min, io, io::ErrorKind};
+
 use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
 use chrono::NaiveDate;
 
-use crate::block::BlockDevice;
+use crate::block::{BlockDevice, BLOCK_SIZE};
 
 #[derive(Clone, Debug)]
 pub struct RT11FS<B: BlockDevice> {
@@ -113,6 +115,46 @@ impl<B: BlockDevice> RT11FS<B> {
     pub fn used_blocks(&self) -> usize {
         self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
     }
+
+    pub fn find_empty_space<'a>(&'a self, blocks: usize) -> Option<(usize, usize)> {
+        for (s, seg) in self.dir.iter().enumerate() {
+            for (e, f) in seg.entries.iter().enumerate() {
+                if f.kind != EntryKind::Empty || f.length < blocks { continue }
+                return Some((s, e))
+            }
+        }
+        None
+    }
+
+    pub fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
+        let blocks = (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        DirEntry::encode_filename(name)?;
+        let Some((segment, entry)) = self.find_empty_space(blocks) else { return Err(anyhow!("No space available in image")) };
+        if self.dir[segment].entries.len() + 1 > self.dir[segment].max_entries() {
+            // Too many entries to fit in segment.
+            // We _should_ split the segment here but I don't want to write that yet :-)
+            return Err(anyhow!("No more entries in the segment and splitting segments is not implemented yet!"));
+        }
+        let mut new_free = self.dir[segment].entries[entry].clone();
+        self.dir[segment].entries[entry].name = name.to_owned();
+        self.dir[segment].entries[entry].length = blocks;
+        self.dir[segment].entries[entry].kind = EntryKind::Permanent;
+        self.dir[segment].entries[entry].read_only = false;
+        self.dir[segment].entries[entry].protected = false;
+        self.dir[segment].entries[entry].job = 0;
+        self.dir[segment].entries[entry].channel = 0;
+        self.dir[segment].entries[entry].creation_date = Some(chrono::Local::now().date_naive());
+        new_free.block += blocks;
+        new_free.length -= blocks;
+        self.dir[segment].entries.insert(entry+1, new_free);
+        self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)?;
+        Ok(RT11FileWriter{
+            image: &mut self.image,
+            direntry: &self.dir[segment].entries[entry],
+            residue: vec![],
+            pos: 0,
+        })
+    }
 }
 
 const STATUS_E_TENT: u16 = 0o000400;
@@ -161,6 +203,49 @@ impl DirSegment {
                 entries
             },
         })
+    }
+
+    pub fn repr(&self) -> anyhow::Result<[u8; 2 * BLOCK_SIZE]> {
+        let mut repr = ByteBuffer::new();
+        repr.set_endian(Endian::LittleEndian);
+        repr.write_u16(self.segments);
+        repr.write_u16(self.next_segment);
+        repr.write_u16(self.last_segment);
+        repr.write_u16(self.extra_bytes);
+        repr.write_u16(self.data_block);
+        for entry in self.entries.iter() {
+            repr.write_bytes(&entry.repr()?);
+        }
+        repr.write_u16(STATUS_E_EOS);
+        repr.resize(2 * BLOCK_SIZE);
+        Ok(repr.as_bytes().try_into()?)
+    }
+
+    fn max_entries(&self) -> usize {
+        const SEGMENT_BLOCKS: usize = 2;
+        const SEGMENT_HEADER_BYTES: usize = std::mem::size_of::<[u16; 5]>();
+        const DIR_ENTRY_BYTES: usize = std::mem::size_of::<[u16; 7]>();
+        const SEGMENT_END_MARKER_BYTES: usize = std::mem::size_of::<u16>();
+        const RESERVED_ENTRIES: usize = 3 - 1; // See NOTE, below.
+        // This is slightly more complicated than you'd expect because:
+        //   a) each segment is allowed to have extra bytes per dir entry
+        //   b) the end of segment marker doesn't have to have a full
+        //      directory entry's worth of space--it only needs 1 word
+        // Each segment is defined as 2 blocks, the contents of which are:
+        //   segment_header + dir_entries[N] + segment_end_marker
+
+        // NOTE: The "RT–11 Volume and File Formats Manual" says in section
+        // 1.1.4 to reserve 3 directory entries when calculating the max
+        // number--however, one of those is the end-of-segment marker. This
+        // would mean that the end-of-segment marker consumes an entire
+        // directory entries worth of bytes. However, in Table 1-3 of
+        // section 1.1.2.2 it says "Note that an end-of-segment marker can
+        // appear as the last word of a segment."  That means their
+        // calculations in section 1.1.4 are slightly off. I've tweaked the
+        // calculation to account for the short end-of-marker entry by
+        // subtracting it off the top and then only having 2 reserved
+        // entries. I believe this is more correct.
+        (BLOCK_SIZE * SEGMENT_BLOCKS - SEGMENT_HEADER_BYTES - SEGMENT_END_MARKER_BYTES) / (DIR_ENTRY_BYTES + self.extra_bytes as usize) - RESERVED_ENTRIES
     }
 }
 
@@ -219,6 +304,51 @@ impl DirEntry {
         }))
     }
 
+    pub fn repr(&self) -> anyhow::Result<Vec<u8>> {
+        let mut repr = ByteBuffer::new();
+        repr.set_endian(Endian::LittleEndian);
+        repr.write_u16(0 | match self.kind {
+                               EntryKind::Empty     => STATUS_E_MPTY,
+                               EntryKind::Tentative => STATUS_E_TENT,
+                               EntryKind::Permanent => STATUS_E_PERM,
+                           }
+                         | if self.read_only    { STATUS_E_READ } else { 0 }
+                         | if self.read_only    { STATUS_E_PROT } else { 0 }
+                         | if self.prefix_block { STATUS_E_PRE  } else { 0 });
+        for r50 in Self::encode_filename(&self.name)? {
+            repr.write_u16(r50);
+        }
+        repr.write_u16(self.length as u16);
+        repr.write_u8(self.job);
+        repr.write_u8(self.channel);
+        repr.write_u16(Self::encode_date(self.creation_date)?);
+        for e in self.extra.iter() {
+            repr.write_u16(*e);
+        }
+        Ok(repr.into_vec())
+    }
+
+    pub fn encode_filename(name: &str) -> anyhow::Result<[u16; 3]> {
+        let Some((name, ext)) = name.split_once(".") else { return Err(anyhow!("{}: missing extension", name)) };
+        if name.len() > 6 || name.len() < 1 || ext.len() > 3 || ext.len() < 1 { return Err(anyhow!("{}: name should 1 to 6 chars, extention should be 1 to 3", name)) };
+        let name_w = radix50::pdp11::encode(&format!("{:<6}", name))?;
+        let ext_w  = radix50::pdp11::encode_word(&format!("{:<3}", ext))?;
+        Ok([name_w[0], name_w[1], ext_w])
+    }
+
+    pub fn encode_date(date: Option<NaiveDate>) -> anyhow::Result<u16> {
+        use chrono::Datelike;
+        let Some(date) = date else { return Ok(0) };
+        let yoff = date.year() - 1972;
+        if yoff      < 0 { return Err(anyhow!("Date {} is before 1972", date.to_string())) }
+        if yoff / 32 > 3 { return Err(anyhow!("Date {} is after {}", date.to_string(), 1972 + 3 * 32)) }
+
+        Ok(0 | ((yoff as u16 / 32)    << 14) & 0b11_0000_00000_00000
+             | ((date.month() as u16) << 10) & 0b00_1111_00000_00000
+             | ((date.day()   as u16) <<  5) & 0b00_0000_11111_00000
+             | ((yoff as u16)         <<  0) & 0b00_0000_00000_11111)
+    }
+
     pub fn decode_date(raw: u16) -> anyhow::Result<Option<NaiveDate>> {
         let (age, month, day, year) = (((raw & 0b11_0000_00000_00000) >> 14) as i32,
                                        ((raw & 0b00_1111_00000_00000) >> 10) as u32,
@@ -249,5 +379,43 @@ impl<'a, B: BlockDevice> Iterator for DirEntryIterator<'a, B> {
             self.entry = 0;
         }
         Some(entry)
+    }
+}
+
+pub struct RT11FileWriter<'a, B:BlockDevice> {
+    image: &'a mut B,
+    direntry: &'a DirEntry,
+    residue: Vec<u8>,
+    pos: usize,
+}
+
+impl<'a, B: BlockDevice> std::io::Write for RT11FileWriter<'a, B> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.pos == self.direntry.length { return Err(io::Error::from(ErrorKind::OutOfMemory /*FileTooLarge, once it's stabilized*/)) }
+        let truncated = &buf[0..min(buf.len(), (self.direntry.length - self.pos) * BLOCK_SIZE - self.residue.len())];
+        let remains = if self.residue.len() > 0 {
+            let (residue_fill, remains) = truncated.split_at(min(truncated.len(), BLOCK_SIZE - self.residue.len()));
+            self.residue.extend_from_slice(&residue_fill);
+            if self.residue.len() == BLOCK_SIZE {
+                self.image.write_blocks(self.direntry.block + self.pos, 1, &self.residue).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+                self.pos += 1;
+                self.residue.clear();
+            }
+            remains
+        } else {
+            truncated
+        };
+        let blocks = remains.len() / BLOCK_SIZE;
+        if blocks > 0 {
+            let (chunk, residue) = remains.split_at(blocks * BLOCK_SIZE);
+            self.image.write_blocks(self.direntry.block + self.pos, blocks, &chunk).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+            self.pos += blocks;
+            self.residue.extend_from_slice(residue);
+        }
+        Ok(truncated.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        todo!()
     }
 }
