@@ -82,7 +82,8 @@ impl<B: BlockDevice> RT11FS<B> {
         let mut segments = vec![];
         let mut segment = home.directory_start_block;
         while segment != 0 {
-            let next = DirSegment::from_repr(segment, image.block(segment as usize, 2)?)?;
+            let next = DirSegment::from_repr(segment, image.block(segment as usize, 2)?)
+                .with_context(|| format!("Bad Directory Segment #{} (@ {})", segments.len(), segment))?;
             segment = next.next_segment;
             segments.push(next);
         }
@@ -156,6 +157,7 @@ impl DirSegment {
                     block += entry.length;
                     entries.push(entry);
                 }
+                if entries.len() < 2 { return Err(anyhow!("Too few directory entries: {} (should be >=2)", entries.len())) }
                 entries
             },
         })
