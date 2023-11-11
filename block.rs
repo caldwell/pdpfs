@@ -21,10 +21,19 @@ pub trait BlockDevice {
         Ok(ByteBuffer::from_bytes(&buf))
     }
 
+    fn write_blocks(&mut self, block: usize, blocks: usize, buf: &[u8]) -> anyhow::Result<()> {
+        let ssz = self.sector_size();
+        for s in 0..blocks*BLOCK_SIZE/ssz {
+            self.write_sector(block*BLOCK_SIZE/ssz + s, &buf[s * ssz..(s+1) * ssz])?;
+        }
+        Ok(())
+    }
+
     fn blocks(&self) -> usize {
         self.sectors() * self.sector_size() / BLOCK_SIZE
     }
     fn sector(&self, sector: usize) -> anyhow::Result<Vec<u8>>;
+    fn write_sector(&mut self, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn sector_size(&self) -> usize;
     fn sectors(&self) -> usize;
     fn physical_device(&self) -> &impl PhysicalBlockDevice;
@@ -33,6 +42,7 @@ pub trait BlockDevice {
 pub trait PhysicalBlockDevice {
     fn geometry(&self) -> &Geometry;
     fn sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>>;
+    fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
 }
 
 #[derive(Clone, Debug)]

@@ -2,6 +2,8 @@
 
 use super::{Geometry, PhysicalBlockDevice};
 
+use anyhow::anyhow;
+
 pub struct IMG {
     pub data: Vec<u8>,
     pub geometry: Geometry,
@@ -22,6 +24,16 @@ impl PhysicalBlockDevice for IMG {
                           + head   * self.geometry.sectors
                           + sector;
         Ok(self.data[start*self.geometry.sector_size..(start + 1)*self.geometry.sector_size].to_owned())
+    }
+
+    fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
+        if buf.len() != self.geometry.sector_size { return Err(anyhow!("Sector {}: Can't write partial sector ({} len)", sector, buf.len())) }
+        let start = cylinder * self.geometry.sectors * self.geometry.heads
+                          + head   * self.geometry.sectors
+                          + sector;
+        self.data.splice(start*self.geometry.sector_size..(start + 1)*self.geometry.sector_size,
+            buf.into_iter().map(|b| *b));
+        Ok(())
     }
 
     fn geometry(&self) -> &Geometry {

@@ -145,4 +145,10 @@ impl PhysicalBlockDevice for IMD {
     fn geometry(&self) -> &Geometry {
         &self.geometry
     }
+    fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
+        use pretty_hex::PrettyHex;
+        println!("Writing CHS({},{},{}):\n{:?}", cylinder, head, sector, buf.hex_dump());
+        todo!();
+        //Ok(())
+    }
 }

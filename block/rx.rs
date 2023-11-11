@@ -24,6 +24,11 @@ impl<B: PhysicalBlockDevice> BlockDevice for RX<B> {
         self.0.sector(c+1,h,s) // RT-11 skips track 0 on RX devices (for IBM interchange compatibility)
     }
 
+    fn write_sector(&mut self, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
+        let (c,h,s) = self.physical_from_logical(sector);
+        self.0.write_sector(c+1,h,s, buf) // RT-11 skips track 0 on RX devices (for IBM interchange compatibility)
+    }
+
     fn sector_size(&self) -> usize {
         self.0.geometry().sector_size
     }
