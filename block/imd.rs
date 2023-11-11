@@ -151,4 +151,7 @@ impl PhysicalBlockDevice for IMD {
         todo!();
         //Ok(())
     }
+    fn as_vec(&self) -> Vec<u8> {
+        todo!()
+    }
 }

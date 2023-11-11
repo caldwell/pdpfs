@@ -39,4 +39,8 @@ impl PhysicalBlockDevice for IMG {
     fn geometry(&self) -> &Geometry {
         &self.geometry
     }
+
+    fn as_vec(&self) -> Vec<u8> {
+        self.data.clone()
+    }
 }

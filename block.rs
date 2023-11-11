@@ -43,6 +43,7 @@ pub trait PhysicalBlockDevice {
     fn geometry(&self) -> &Geometry;
     fn sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
+    fn as_vec(&self) -> Vec<u8>;
 }
 
 #[derive(Clone, Debug)]
