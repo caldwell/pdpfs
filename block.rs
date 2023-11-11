@@ -27,6 +27,7 @@ pub trait BlockDevice {
     fn sector(&self, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn sector_size(&self) -> usize;
     fn sectors(&self) -> usize;
+    fn physical_device(&self) -> &impl PhysicalBlockDevice;
 }
 
 pub trait PhysicalBlockDevice {

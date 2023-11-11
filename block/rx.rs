@@ -32,6 +32,10 @@ impl<B: PhysicalBlockDevice> BlockDevice for RX<B> {
         let g = self.0.geometry();
         (g.cylinders - 1) * g.heads * g.sectors // don't include track 0 in the sector count (see above)
     }
+
+    fn physical_device(&self) -> &impl PhysicalBlockDevice {
+        &self.0
+    }
 }
 
 impl<B: PhysicalBlockDevice> RX<B> {
