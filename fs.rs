@@ -87,6 +87,7 @@ impl<B: BlockDevice> RT11FS<B> {
             let extra_bytes;
             let data_block;
             let next = DirSegment {
+                block: segment,
                 segments: buf.read_u16()?,
                 next_segment: buf.read_u16()?,
                 last_segment: buf.read_u16()?,
@@ -182,6 +183,9 @@ pub struct DirSegment {
     pub extra_bytes: u16,
     pub data_block: u16,
     pub entries: Vec<DirEntry>,
+
+    // Not part of the format.
+    pub block: u16, // The block number of _this_ segment
 }
 
 #[derive(Clone, Debug)]
