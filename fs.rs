@@ -117,15 +117,7 @@ impl<B: BlockDevice> RT11FS<B> {
                             length: { length = buf.read_u16()? as usize; length },
                             job: buf.read_u8()?,
                             channel: buf.read_u8()?,
-                            creation_date: {
-                                let raw = buf.read_u16()?;
-                                let (age, month, day, year) = (((raw & 0b11_0000_00000_00000) >> 14) as i32,
-                                                               ((raw & 0b00_1111_00000_00000) >> 10) as u32,
-                                                               ((raw & 0b00_0000_11111_00000) >> 5) as u32,
-                                                               ((raw & 0b00_0000_00000_11111) >> 0) as i32);
-                                if raw == 0 { None }
-                                else { Some(chrono::NaiveDate::from_ymd_opt(1972 + year + age * 32, month, day).ok_or(anyhow!("Invalid date: {:04}-{:02}-{:02} [{}/{:#06x}/{:#018b}]", year, month, day, raw, raw, raw))?) }
-                            },
+                            creation_date: DirEntry::decode_date(buf.read_u16()?)?,
                             extra: (0..extra_bytes).map(|_| -> anyhow::Result<u16> { Ok(buf.read_u16()?) }).collect::<anyhow::Result<Vec<u16>>>()?,
 
                             // Pre-compute block addresses of files for convenience
@@ -210,6 +202,20 @@ pub enum EntryKind {
     Tentative,
     Empty,
     Permanent,
+}
+
+impl DirEntry {
+    pub fn decode_date(raw: u16) -> anyhow::Result<Option<NaiveDate>> {
+        let (age, month, day, year) = (((raw & 0b11_0000_00000_00000) >> 14) as i32,
+                                       ((raw & 0b00_1111_00000_00000) >> 10) as u32,
+                                       ((raw & 0b00_0000_11111_00000) >>  5) as u32,
+                                       ((raw & 0b00_0000_00000_11111) >>  0) as i32);
+        Ok(match raw {
+            0 => None,
+            _ => Some(chrono::NaiveDate::from_ymd_opt(1972 + year + age * 32, month, day)
+                          .ok_or(anyhow!("Invalid date: {:04}-{:02}-{:02} [{}/{:#06x}/{:#018b}]", year, month, day, raw, raw, raw))?),
+           })
+    }
 }
 
 pub struct DirEntryIterator<'a, B: BlockDevice> {
