@@ -15,19 +15,6 @@ pub struct RT11FS<B: BlockDevice> {
     pub dir: Vec<DirSegment>,
 }
 
-#[derive(Clone, Debug)]
-pub struct HomeBlock {
-    pub bad_block_replacement_table: [u8; 130],
-    pub init_restore: [u8; 38],
-    pub bup_volume: Option<u8>,
-    pub pack_cluster_size: u16,
-    pub directory_start_block: u16,
-    pub system_version: String,
-    pub volume_id: String,
-    pub owner_name: String,
-    pub system_id: String,
-}
-
 impl<B: BlockDevice> RT11FS<B> {
     pub fn new(image: B) -> anyhow::Result<RT11FS<B>> {
         let home = Self::read_homeblock(&image)?;
@@ -155,6 +142,19 @@ impl<B: BlockDevice> RT11FS<B> {
             pos: 0,
         })
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct HomeBlock {
+    pub bad_block_replacement_table: [u8; 130],
+    pub init_restore: [u8; 38],
+    pub bup_volume: Option<u8>,
+    pub pack_cluster_size: u16,
+    pub directory_start_block: u16,
+    pub system_version: String,
+    pub volume_id: String,
+    pub owner_name: String,
+    pub system_id: String,
 }
 
 const STATUS_E_TENT: u16 = 0o000400;
