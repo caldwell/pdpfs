@@ -27,6 +27,7 @@ Usage:
   rt11fs -h
   rt11fs [-h] -i <image> ls
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
+  rt11fs [-h] -i <image> rm <file>
   rt11fs [-h] -i <image> init <device-type>
   rt11fs [-h] -i <image> dump [--sector]
 
@@ -47,6 +48,9 @@ Options:
      # This copies 'FILE.TXT' from the disk image into /tmp/FILE.TXT on the local machine:
      rt11fs -i my_image.img cp FILE.TXT /tmp
 
+ rm:
+   <file> will be deleted from the image.
+
  dump:
    -s --sector            Dump by blocks instead of sectors
 
@@ -65,10 +69,12 @@ struct Args {
     flag_sector:      bool,
     cmd_ls:           bool,
     cmd_cp:           bool,
+    cmd_rm:           bool,
     cmd_dump:         bool,
     cmd_init:         bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
+    arg_file:         PathBuf,
     arg_device_type:  Option<DeviceType>,
 }
 
@@ -120,6 +126,11 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
             (false, false) => Err(anyhow!("Image to image copy is not supported yet."))?,
             (true,  true)  => Err(anyhow!("Either the source or destination file needs to be on the image"))?,
         }
+    }
+
+    if args.cmd_rm {
+        rm(&mut fs, &args.arg_file)?;
+        save_image(fs.image.physical_device(), &args.flag_image)?;
     }
 
     Ok(())
@@ -187,6 +198,10 @@ fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+fn rm<B: BlockDevice>(fs: &mut RT11FS<B>, file: &Path) -> anyhow::Result<()> {
+    fs.delete(&path_to_rt11_filename(file)?)
 }
 
 fn init(image: &Path, dtype: DeviceType) -> anyhow::Result<()> {
