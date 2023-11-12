@@ -100,9 +100,9 @@ fn main() -> anyhow::Result<()> {
 fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Result<()> {
     let rx = RX(dev);
 
+    // Do this early so we can dump corrupt images (since RT11FS::new() might die).
     if args.cmd_dump {
-        dump(&rx, args.flag_sector)?;
-        return Ok(())
+        return dump(&rx, args.flag_sector);
     }
 
     let mut fs = RT11FS::new(rx)?;
