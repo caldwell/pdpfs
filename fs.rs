@@ -471,6 +471,18 @@ pub struct RT11FileWriter<'a, B:BlockDevice> {
     pos: usize,
 }
 
+impl <'a, B: BlockDevice> RT11FileWriter<'a, B> {
+    #[allow(unused)]
+    pub fn close(mut self) -> anyhow::Result<()> {
+        return self._close()
+    }
+    fn _close(&mut self) -> anyhow::Result<()> {
+        use std::io::Write;
+        self.flush()?;
+        Ok(())
+    }
+}
+
 impl<'a, B: BlockDevice> std::io::Write for RT11FileWriter<'a, B> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if self.pos == self.direntry.length { return Err(io::Error::from(ErrorKind::OutOfMemory /*FileTooLarge, once it's stabilized*/)) }
@@ -500,7 +512,20 @@ impl<'a, B: BlockDevice> std::io::Write for RT11FileWriter<'a, B> {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        todo!()
+        if self.residue.len() > 0 {
+            if self.pos == self.direntry.length { return Err(io::Error::from(ErrorKind::OutOfMemory /*FileTooLarge, once it's stabilized*/)) }
+            self.residue.extend_from_slice(&vec![0; BLOCK_SIZE - self.residue.len()]);
+            self.image.write_blocks(self.direntry.block + self.pos, 1, &self.residue).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+            self.pos += 1;
+            self.residue.clear();
+        }
+        Ok(())
+    }
+}
+
+impl<'a, B: BlockDevice> Drop for RT11FileWriter<'a, B> {
+    fn drop(&mut self) {
+        _ = self._close();
     }
 }
 
@@ -611,5 +636,16 @@ mod test {
             f.write(&incrementing(256)).expect("write");
         }
         assert_block_eq!(fs.image, 14, incrementing(512));
+    }
+
+    #[test]
+    fn test_write_partial_block() {
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        {
+            let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
+            f.write(&incrementing(256)).expect("write");
+        }
+        assert_block_eq!(fs.image, 14, incrementing(256), vec![0; 256]);
     }
 }
