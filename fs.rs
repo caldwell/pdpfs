@@ -266,7 +266,7 @@ impl DirSegment {
                     block += entry.length;
                     entries.push(entry);
                 }
-                if entries.len() < 2 { return Err(anyhow!("Too few directory entries: {} (should be >=2)", entries.len())) }
+                if entries.len() < 1 { return Err(anyhow!("Too few directory entries: {} (should be >=1)", entries.len())) }
                 entries
             },
         })
