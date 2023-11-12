@@ -27,6 +27,7 @@ Usage:
   rt11fs -h
   rt11fs [-h] -i <image> ls
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
+  rt11fs [-h] -i <image> init <device-type>
   rt11fs [-h] -i <image> dump [--sector]
 
 Options:
@@ -50,7 +51,14 @@ Options:
    -s --sector            Dump by blocks instead of sectors
 
    Dumps the image, de-interleaving floppy images.
+
+ init:
+   Initializes a new image. The <image> file specified by `-i` will be created
+   and must _not_ already exist.
+
+   <device-type> must be: rx01
 ";
+
 #[derive(Debug, Deserialize)]
 struct Args {
     flag_image:       PathBuf,
@@ -58,13 +66,27 @@ struct Args {
     cmd_ls:           bool,
     cmd_cp:           bool,
     cmd_dump:         bool,
+    cmd_init:         bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
+    arg_device_type:  Option<DeviceType>,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum DeviceType {
+    RX01,
+}
+
 fn main() -> anyhow::Result<()> {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
+
+    // Do this very early since we normally die if the image file doesn't exist
+    if args.cmd_init {
+        return init(&args.flag_image, args.arg_device_type.unwrap());
+    }
 
     let image = std::fs::read(&args.flag_image)?;
     match (&image[0..3], image.len()) {
@@ -148,7 +170,9 @@ fn save_image<P: PhysicalBlockDevice>(dev: &P, filename: &Path) -> anyhow::Resul
     let newname = filename.append(".new");
     let bakname = filename.append(".bak");
     std::fs::write(&newname, &new_image).with_context(|| format!("{}", newname.to_string_lossy()))?;
-    rename(filename, &bakname)?;
+    if filename.exists() {
+        rename(filename, &bakname)?;
+    }
     rename(&newname, filename)?;
     Ok(())
 }
@@ -163,6 +187,22 @@ fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
             println!("Block {}\n{:?}", b, image.block(b, 1)?.as_bytes().hex_dump());
         }
     }
+    Ok(())
+}
+
+fn init(image: &Path, dtype: DeviceType) -> anyhow::Result<()> {
+    let ext = image.extension().and_then(|oss| oss.to_str());
+    match (dtype, ext) {
+        (DeviceType::RX01, Some("img")) => return init_fs(image, RX(IMG::from_bytes(&[0; 256256], RX01_GEOMETRY))),
+        (DeviceType::RX01, Some("imd")) => return init_fs(image, RX(IMD::from_img(IMG::from_bytes(&[0; 256256], RX01_GEOMETRY)))),
+        (DeviceType::RX01, Some(ext)) => return Err(anyhow!("Unknown image type {}", ext)),
+        (DeviceType::RX01, None)      => return Err(anyhow!("Unknown image type for {}", image.to_string_lossy())),
+    }
+}
+
+fn init_fs<B: BlockDevice>(path: &Path, image: B) -> anyhow::Result<()> {
+    let fs = RT11FS::init(image)?;
+    save_image(fs.image.physical_device(), path)?;
     Ok(())
 }
 

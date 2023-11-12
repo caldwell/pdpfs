@@ -142,6 +142,15 @@ impl<B: BlockDevice> RT11FS<B> {
             pos: 0,
         })
     }
+
+    // Initialize a filesystem on this image
+    pub fn init(mut image: B) -> anyhow::Result<RT11FS<B>> {
+        let home = HomeBlock::new();
+        image.write_blocks(1, 1, &home.repr()?)?;
+        let dir_segment = DirSegment::new(home.directory_start_block, 4, image.blocks() as u16);
+        image.write_blocks(home.directory_start_block as usize, 2, &dir_segment.repr()?)?;
+        return Self::new(image);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -155,6 +164,49 @@ pub struct HomeBlock {
     pub volume_id: String,
     pub owner_name: String,
     pub system_id: String,
+}
+
+impl HomeBlock {
+    pub fn new() -> HomeBlock {
+        HomeBlock {
+            bad_block_replacement_table: [0; 0o202],
+            init_restore: [0; 0o252-0o204],
+            bup_volume: None,
+            pack_cluster_size: 1 /* what is this?? */,
+            directory_start_block: 6,
+            system_version: "V3A".to_string(),
+            volume_id: "RT11FS DC".to_string(), // FIXME: Make this settable?
+            owner_name: whoami::username(),
+            system_id: "DECRT11A".to_string(),
+        }
+    }
+
+    pub fn repr(&self) -> anyhow::Result<[u8; BLOCK_SIZE]> {
+        let mut repr = ByteBuffer::new();
+        repr.set_endian(Endian::LittleEndian);
+        repr.write_bytes(&self.bad_block_replacement_table);
+        repr.write_bytes(&self.init_restore);
+        match self.bup_volume {
+            Some(num) => { repr.write_bytes(format!("{:<12}", "BUQ").as_bytes());
+                           repr.write_u8(num); },
+            None => {},
+        };
+        repr.resize(0o722);
+        repr.set_wpos(0o722);
+        repr.write_u16(self.pack_cluster_size);
+        repr.write_u16(self.directory_start_block);
+        repr.write_u16(radix50::pdp11::encode_word(&self.system_version)?);
+        repr.write_bytes(format!("{:<12.12}", self.volume_id).as_bytes());
+        repr.write_bytes(format!("{:<12.12}", self.owner_name).as_bytes());
+        repr.write_bytes(format!("{:<12.12}", self.system_id).as_bytes());
+        repr.write_u16(0); // unused
+        let mut checksum = 0u16;
+        while let Ok(word) = repr.read_u16() {
+            checksum = checksum.wrapping_add(word);
+        }
+        repr.write_u16(checksum);
+        Ok(repr.into_vec().try_into().expect("Can't happen."))
+    }
 }
 
 const STATUS_E_TENT: u16 = 0o000400;
@@ -179,6 +231,21 @@ pub struct DirSegment {
 }
 
 impl DirSegment {
+    // This is for initializing a new set of segments on a blank disk
+    pub fn new(my_block: u16, segments: u16, total_blocks: u16) -> DirSegment {
+        let data_block = my_block + segments * 2;
+        let segments = 4; // This is RT-11's default. Should it be configurable like it is there?
+        DirSegment {
+            block: my_block,
+            segments,
+            next_segment: 0,
+            last_segment:  1,
+            extra_bytes: 0,
+            data_block,
+            entries: vec![DirEntry::new_empty(data_block as usize, (total_blocks - data_block) as usize)],
+        }
+    }
+
     pub fn from_repr(my_block: u16, mut buf: ByteBuffer) -> anyhow::Result<DirSegment> {
         buf.set_endian(Endian::LittleEndian);
         let extra_bytes;
@@ -274,6 +341,16 @@ pub enum EntryKind {
 }
 
 impl DirEntry {
+    pub fn new_empty(data_block: usize, blocks: usize) -> DirEntry {
+        DirEntry {
+            kind: EntryKind::Empty,
+            name: "EMPTYF.ILE".to_string(),
+            length: blocks,
+            block: data_block,
+            read_only: false, protected: false, prefix_block: false, job: 0, channel: 0, creation_date: None, extra: vec![],
+        }
+    }
+
     pub fn from_repr(data_block: usize, extra_bytes: u16, buf: &mut ByteBuffer) -> anyhow::Result<Option<DirEntry>> {
         let status = buf.read_u16()?;
         let length;
