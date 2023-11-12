@@ -488,6 +488,8 @@ impl<'a, B: BlockDevice> std::io::Write for RT11FileWriter<'a, B> {
             self.image.write_blocks(self.direntry.block + self.pos, blocks, &chunk).map_err(|e| io::Error::new(ErrorKind::Other, e))?;
             self.pos += blocks;
             self.residue.extend_from_slice(residue);
+        } else {
+            self.residue.extend_from_slice(remains);
         }
         Ok(truncated.len())
     }
@@ -580,6 +582,21 @@ mod test {
         let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
         { let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             f.write(&incrementing(512)).expect("write"); }
+        assert_block_eq!(fs.image, 14, incrementing(512));
+    }
+
+    #[test]
+    fn test_write_chunk() {
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        {
+            let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
+            assert_eq!(f.pos, 0);
+            assert_eq!(f.residue, vec![]);
+            f.write(&incrementing(256)).expect("write");
+            assert_eq!(f.residue, incrementing(256));
+            f.write(&incrementing(256)).expect("write");
+        }
         assert_block_eq!(fs.image, 14, incrementing(512));
     }
 }
