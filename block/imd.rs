@@ -122,6 +122,35 @@ impl IMD {
             track: tracks,
         })
     }
+
+    pub fn from_img(img: super::img::IMG)  -> IMD {
+        let g = img.geometry().clone();
+        IMD {
+            comment: format!("IMD 1.18: {}\nConverted from IMG by rt11fs[1]\n[1]: https://porkrind.org/rt11fs\n",
+                chrono::Local::now().format("%m/%d/Y %H:%M:%S")),
+            track: (0..g.cylinders).map(|c| {
+                let c = c;
+                (0..g.heads).map(move |h| {
+                    Track {
+                        mode: Mode::M250kbitsFM, // FIXME!!! Don't hardcode this!
+                        cylinder: c as u8,
+                        head: h as u8,
+                        sector_count: g.sectors as u8,
+                        sector_size: g.sector_size,
+                        sector_map: (0..g.sectors).map(|s| (s+1) as u8).collect(),
+                        sector_data: (0..g.sectors).map(|_| {
+                            Sector {
+                                data: SectorData::Compressed(0, g.sector_size),
+                                deleted: false,
+                                error: false,
+                            }
+                        }).collect(),
+                    }
+                })
+            }).flatten().collect(),
+            geometry: g,
+        }
+    }
 }
 
 impl Sector {
