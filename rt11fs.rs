@@ -149,7 +149,7 @@ fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> any
         return Err(anyhow!("File not found: {}", source_file));
     };
     print!("{} -> {}", file.name, local_dest.to_string_lossy());
-    let data = fs.image.block(file.block, file.length)?;
+    let data = fs.image.read_blocks(file.block, file.length)?;
     std::fs::write(local_dest, data.as_bytes())?;
     print!("... Successfully copied {} blocks ({} bytes)\n", file.length, file.length * block::BLOCK_SIZE);
     Ok(())
@@ -180,11 +180,11 @@ fn save_image<P: PhysicalBlockDevice>(dev: &P, filename: &Path) -> anyhow::Resul
 fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
     if by_sector {
         for s in 0..image.sectors() {
-            println!("Sector {}\n{:?}", s, image.sector(s)?.hex_dump());
+            println!("Sector {}\n{:?}", s, image.read_sector(s)?.hex_dump());
         }
     } else {
         for b in 0..image.blocks() {
-            println!("Block {}\n{:?}", b, image.block(b, 1)?.as_bytes().hex_dump());
+            println!("Block {}\n{:?}", b, image.read_blocks(b, 1)?.as_bytes().hex_dump());
         }
     }
     Ok(())

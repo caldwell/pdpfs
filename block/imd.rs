@@ -168,7 +168,7 @@ impl Sector {
 }
 
 impl PhysicalBlockDevice for IMD {
-    fn sector(&self, cylinder: usize, _head: usize, sector: usize) -> anyhow::Result<Vec<u8>> {
+    fn read_sector(&self, cylinder: usize, _head: usize, sector: usize) -> anyhow::Result<Vec<u8>> {
         Ok(self.track[cylinder].sector_data[self.track[cylinder].sector_map[sector] as usize - 1].as_bytes()?)
     }
     fn geometry(&self) -> &Geometry {

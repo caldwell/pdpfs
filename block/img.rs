@@ -19,7 +19,7 @@ impl IMG {
 }
 
 impl PhysicalBlockDevice for IMG {
-    fn sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>> {
+    fn read_sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>> {
         let start = cylinder * self.geometry.sectors * self.geometry.heads
                           + head   * self.geometry.sectors
                           + sector;

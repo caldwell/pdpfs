@@ -19,9 +19,9 @@ pub const RX02_GEOMETRY: Geometry = Geometry {
 pub struct RX<B: PhysicalBlockDevice>(pub B);
 
 impl<B: PhysicalBlockDevice> BlockDevice for RX<B> {
-    fn sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
+    fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
         let (c,h,s) = self.physical_from_logical(sector);
-        self.0.sector(c+1,h,s) // RT-11 skips track 0 on RX devices (for IBM interchange compatibility)
+        self.0.read_sector(c+1,h,s) // RT-11 skips track 0 on RX devices (for IBM interchange compatibility)
     }
 
     fn write_sector(&mut self, sector: usize, buf: &[u8]) -> anyhow::Result<()> {

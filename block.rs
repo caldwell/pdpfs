@@ -12,11 +12,11 @@ use bytebuffer::ByteBuffer;
 pub const BLOCK_SIZE: usize = 512; // This seems baked into the format, and unrelated to sector size, interestingly (which is 128 bytes on an RX-01).
 
 pub trait BlockDevice {
-    fn block(&self, block: usize, count: usize) -> anyhow::Result<ByteBuffer> {
+    fn read_blocks(&self, block: usize, count: usize) -> anyhow::Result<ByteBuffer> {
         let ssz = self.sector_size();
         let mut buf = vec![];
         for b in block*BLOCK_SIZE/ssz..(block+count)*BLOCK_SIZE/ssz {
-            buf.extend(self.sector(b)?);
+            buf.extend(self.read_sector(b)?);
         }
         Ok(ByteBuffer::from_bytes(&buf))
     }
@@ -32,7 +32,7 @@ pub trait BlockDevice {
     fn blocks(&self) -> usize {
         self.sectors() * self.sector_size() / BLOCK_SIZE
     }
-    fn sector(&self, sector: usize) -> anyhow::Result<Vec<u8>>;
+    fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn write_sector(&mut self, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn sector_size(&self) -> usize;
     fn sectors(&self) -> usize;
@@ -41,7 +41,7 @@ pub trait BlockDevice {
 
 pub trait PhysicalBlockDevice {
     fn geometry(&self) -> &Geometry;
-    fn sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>>;
+    fn read_sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn as_vec(&self) -> Vec<u8>;
 }

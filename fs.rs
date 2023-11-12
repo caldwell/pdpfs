@@ -27,7 +27,7 @@ impl<B: BlockDevice> RT11FS<B> {
     }
 
     pub fn read_homeblock(image: &B) -> anyhow::Result<HomeBlock> {
-        let mut buf = image.block(1, 1)?;
+        let mut buf = image.read_blocks(1, 1)?;
         buf.set_endian(Endian::LittleEndian);
 
         let computed_sum = {
@@ -71,7 +71,7 @@ impl<B: BlockDevice> RT11FS<B> {
         let mut segments = vec![];
         let mut segment = home.directory_start_block;
         while segment != 0 {
-            let next = DirSegment::from_repr(segment, image.block(segment as usize, 2)?)
+            let next = DirSegment::from_repr(segment, image.read_blocks(segment as usize, 2)?)
                 .with_context(|| format!("Bad Directory Segment #{} (@ {})", segments.len(), segment))?;
             segment = next.next_segment;
             segments.push(next);
