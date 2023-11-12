@@ -124,6 +124,10 @@ impl<B: BlockDevice> RT11FS<B> {
         self.find(|f| f.kind == EntryKind::Empty && f.length >= blocks)
     }
 
+    fn find_file_named(&self, name: &str) -> Option<(usize, usize)> {
+        self.find(|f| f.kind == EntryKind::Permanent && f.name == name)
+    }
+
     pub fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
         let blocks = (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
         DirEntry::encode_filename(name)?;
@@ -152,6 +156,27 @@ impl<B: BlockDevice> RT11FS<B> {
             residue: vec![],
             pos: 0,
         })
+    }
+
+    pub fn delete(&mut self, name: &str) -> anyhow::Result<()> {
+        let Some((segment, entry)) = self.find_file_named(name) else { return Err(anyhow!("File not found")) };
+        self.dir[segment].entries[entry].kind = EntryKind::Empty;
+        self.coalesce_empty(segment, entry);
+        if entry > 0 {
+            self.coalesce_empty(segment, entry-1);
+        }
+        Ok(())
+    }
+
+    pub fn coalesce_empty(&mut self, segment: usize, entry: usize) {
+        if entry+1 >= self.dir[segment].entries.len() ||
+           self.dir[segment].entries[entry  ].kind != EntryKind::Empty ||
+           self.dir[segment].entries[entry+1].kind != EntryKind::Empty {
+            return;
+        }
+
+        self.dir[segment].entries[entry].length += self.dir[segment].entries[entry+1].length;
+        self.dir[segment].entries.drain(entry+1..=entry+1);
     }
 
     // Initialize a filesystem on this image
@@ -327,7 +352,7 @@ impl DirSegment {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DirEntry {
     pub kind: EntryKind,
     pub read_only: bool,
@@ -653,5 +678,29 @@ mod test {
             f.write(&incrementing(256)).expect("write");
         }
         assert_block_eq!(fs.image, 14, incrementing(256), vec![0; 256]);
+    }
+    #[test]
+    fn test_remove_file() {
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        {
+            let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
+            f.write(&incrementing(256)).expect("write");
+        }
+        fs.delete("TEST.TXT").expect("delete test.txt");
+        assert_eq!(fs.file_named("TEST.TXT"), None);
+        assert_eq!(fs.used_blocks(), 0);
+    }
+
+    #[test]
+    fn test_coalesce_empty() {
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        {
+            let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
+            f.write(&incrementing(256)).expect("write");
+        }
+        fs.delete("TEST.TXT").expect("delete test.txt");
+        assert_eq!(fs.dir[0].entries.len(), 1);
     }
 }
