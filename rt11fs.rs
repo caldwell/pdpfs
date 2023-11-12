@@ -157,8 +157,7 @@ fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> any
 
 fn cp_into_image<B: BlockDevice>(fs: &mut RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
     let m = src.metadata()?;
-    let mut fh = fs.create(&dest.to_str().ok_or(anyhow!("Bad filename: {}", dest.to_string_lossy()))?
-                               .to_uppercase(),
+    let mut fh = fs.create(&path_to_rt11_filename(dest)?,
                            m.len() as usize)?;
     let buf = std::fs::read(src)?;
     fh.write(&buf)?;
@@ -204,6 +203,11 @@ fn init_fs<B: BlockDevice>(path: &Path, image: B) -> anyhow::Result<()> {
     let fs = RT11FS::init(image)?;
     save_image(fs.image.physical_device(), path)?;
     Ok(())
+}
+
+fn path_to_rt11_filename(p: &Path) -> anyhow::Result<String> {
+    Ok(p.to_str().ok_or(anyhow!("Bad filename: {}", p.to_string_lossy()))?
+        .to_uppercase())
 }
 
 // Stolen^H^H^H^H^H^H Adapted from https://internals.rust-lang.org/t/pathbuf-has-set-extension-but-no-add-extension-cannot-cleanly-turn-tar-to-tar-gz/14187/10
