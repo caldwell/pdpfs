@@ -108,14 +108,20 @@ impl<B: BlockDevice> RT11FS<B> {
         self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
     }
 
-    pub fn find_empty_space<'a>(&'a self, blocks: usize) -> Option<(usize, usize)> {
+    fn find<F>(&self, predicate: F) -> Option<(usize, usize)>
+    where F: Fn(&DirEntry) -> bool
+    {
         for (s, seg) in self.dir.iter().enumerate() {
             for (e, f) in seg.entries.iter().enumerate() {
-                if f.kind != EntryKind::Empty || f.length < blocks { continue }
+                if !predicate(&f) { continue }
                 return Some((s, e))
             }
         }
         None
+    }
+
+    fn find_empty_space<'a>(&'a self, blocks: usize) -> Option<(usize, usize)> {
+        self.find(|f| f.kind == EntryKind::Empty && f.length >= blocks)
     }
 
     pub fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
