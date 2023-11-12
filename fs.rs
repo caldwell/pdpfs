@@ -6,6 +6,11 @@ use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
 use chrono::NaiveDate;
 
+#[cfg(not(test))] use chrono::Local;
+#[cfg    (test)]  use test::Local;
+
+//use pretty_hex::PrettyHex;
+
 use crate::block::{BlockDevice, BLOCK_SIZE};
 
 #[derive(Clone, Debug)]
@@ -130,7 +135,7 @@ impl<B: BlockDevice> RT11FS<B> {
         self.dir[segment].entries[entry].protected = false;
         self.dir[segment].entries[entry].job = 0;
         self.dir[segment].entries[entry].channel = 0;
-        self.dir[segment].entries[entry].creation_date = Some(chrono::Local::now().date_naive());
+        self.dir[segment].entries[entry].creation_date = Some(Local::now().date_naive());
         new_free.block += blocks;
         new_free.length -= blocks;
         self.dir[segment].entries.insert(entry+1, new_free);
@@ -506,6 +511,14 @@ mod test {
     use pretty_hex::PrettyHex;
     use std::io::Write;
 
+    // Replacement for chrono::Local::now() so that tests are consistent
+    #[allow(non_snake_case)]
+    pub(crate) mod Local {
+        pub(crate) fn now() -> chrono::DateTime<chrono::FixedOffset> {
+            chrono::DateTime::<chrono::FixedOffset>::parse_from_rfc3339("2023-01-19 12:13:14+08:00").unwrap()
+        }
+    }
+
     struct TestDev(Vec<u8>);
     impl BlockDevice for TestDev {
         fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
@@ -574,7 +587,7 @@ mod test {
         { fs.create("TEST.TXT", 512).expect("write test.txt"); }
         assert_block_eq!(fs.image, 6,
             vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x04, 0xdb, 0x7d, 0x00, 0x7d,
-                 0xd4, 0x80, 0x01, 0x00, 0x00, 0x00, 0x73, 0x6d, 0x00, 0x02, 0x58, 0x21, 0xee, 0x80, 0x25, 0x3a,
+                 0xd4, 0x80, 0x01, 0x00, 0x00, 0x00, 0x73, 0x46, 0x00, 0x02, 0x58, 0x21, 0xee, 0x80, 0x25, 0x3a,
                  0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08],
             vec![0; 512-40]);
         assert_block_eq!(fs.image, 14, vec![0; 512]);
