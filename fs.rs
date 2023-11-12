@@ -131,6 +131,7 @@ impl<B: BlockDevice> RT11FS<B> {
     pub fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
         let blocks = (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
         DirEntry::encode_filename(name)?;
+        _ = self.delete(name); // Can only fail because file-not-found, which is a no-op here.
         let Some((segment, entry)) = self.find_empty_space(blocks) else { return Err(anyhow!("No space available in image")) };
         if self.dir[segment].entries.len() + 1 > self.dir[segment].max_entries() {
             // Too many entries to fit in segment.
@@ -679,6 +680,24 @@ mod test {
         }
         assert_block_eq!(fs.image, 14, incrementing(256), vec![0; 256]);
     }
+
+    #[test]
+    fn test_overwrite_file() {
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        {
+            let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
+            f.write(&incrementing(256)).expect("write");
+        }
+        {
+            let mut f = fs.create("TEST.TXT", 1024).expect("write test.txt");
+            f.write(&vec![0x55; 1024]).expect("write");
+        }
+        assert_eq!(fs.dir[0].entries.len(), 2);
+        assert_block_eq!(fs.image, 14, vec![0x55; 512]);
+        assert_block_eq!(fs.image, 15, vec![0x55; 512]);
+    }
+
     #[test]
     fn test_remove_file() {
         let dev = TestDev(vec![0;512*20]);
