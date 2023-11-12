@@ -496,3 +496,90 @@ impl<'a, B: BlockDevice> std::io::Write for RT11FileWriter<'a, B> {
         todo!()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::block::PhysicalBlockDevice;
+    use pretty_hex::PrettyHex;
+    use std::io::Write;
+
+    struct TestDev(Vec<u8>);
+    impl BlockDevice for TestDev {
+        fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
+            Ok(self.0[sector*512..(sector+1)*512].into())
+        }
+        fn write_sector(&mut self, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
+            self.0.splice(sector*512..(sector+1)*512, buf.into_iter().map(|b| *b));
+            Ok(())
+        }
+        fn sector_size(&self) -> usize { 512 }
+        fn sectors(&self) -> usize { self.0.len()/512 }
+        fn physical_device(&self) -> &impl crate::block::PhysicalBlockDevice {
+            self
+        }
+    }
+    impl PhysicalBlockDevice for TestDev {
+        fn geometry(&self) -> &crate::block::Geometry {unimplemented!()}
+        fn read_sector(&self, _cylinder: usize, _head: usize, _sector: usize) -> anyhow::Result<Vec<u8>> {unimplemented!()}
+        fn write_sector(&mut self, _cylinder: usize, _head: usize, _sector: usize, _buf: &[u8]) -> anyhow::Result<()> {unimplemented!()}
+        fn as_vec(&self) -> Vec<u8> {unimplemented!()}
+    }
+
+    macro_rules! assert_block_eq {
+        ($image:expr, $block_num:expr, $( $expected:expr ),*) => {
+            {
+                let got = $image.read_blocks($block_num, 1).expect(&format!("block {}", $block_num));
+                let mut expected = Vec::new();
+                $(expected.extend($expected);)*
+                if got.as_bytes() != expected {
+                    panic!("assertion `block {0} == expected` failed\n  Block {0} was:\n{1:?} \n Expected:\n{2:?}\n",
+                        $block_num, got.as_bytes().hex_dump(), expected.hex_dump());
+                }
+            }
+        };
+    }
+
+
+    #[test]
+    fn test_init() {
+        let dev = TestDev(vec![0;512*20]);
+        let fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        for b in 0..20 {
+            match b {
+                1 => assert_block_eq!(fs.image, 1,
+                    vec![0; 512-48],
+                    vec![0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0xa9, 0x8e, 0x52, 0x54, 0x31, 0x31 ,0x46, 0x53, 0x20, 0x44,
+                         0x43, 0x20, 0x20, 0x20, 0x64, 0x61, 0x76, 0x69, 0x64, 0x20, 0x20, 0x20 ,0x20, 0x20, 0x20, 0x20,
+                         0x44, 0x45, 0x43, 0x52, 0x54, 0x31, 0x31, 0x41, 0x20, 0x20, 0x20, 0x20 ,0x00, 0x00, 0xe6, 0x81]),
+                6 => assert_block_eq!(fs.image, 6,
+                    vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x02, 0x58, 0x21, 0xee, 0x80,
+                         0x25, 0x3a, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+                    vec![0; 512-32]),
+                _ => assert_block_eq!(fs.image, b, vec![0; 512]),
+            }
+        }
+    }
+
+    fn incrementing(count: usize) -> Vec<u8> {
+        (0..count).map(|x| x as u8).collect::<Vec<u8>>()
+    }
+
+    #[test]
+    fn test_write() {
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        { fs.create("TEST.TXT", 512).expect("write test.txt"); }
+        assert_block_eq!(fs.image, 6,
+            vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x04, 0xdb, 0x7d, 0x00, 0x7d,
+                 0xd4, 0x80, 0x01, 0x00, 0x00, 0x00, 0x73, 0x6d, 0x00, 0x02, 0x58, 0x21, 0xee, 0x80, 0x25, 0x3a,
+                 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08],
+            vec![0; 512-40]);
+        assert_block_eq!(fs.image, 14, vec![0; 512]);
+        let dev = TestDev(vec![0;512*20]);
+        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        { let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
+            f.write(&incrementing(512)).expect("write"); }
+        assert_block_eq!(fs.image, 14, incrementing(512));
+    }
+}
