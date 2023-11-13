@@ -214,6 +214,18 @@ impl Sector {
         Ok(buf.into_vec())
     }
 
+    pub fn from_bytes(data: &[u8]) -> Sector {
+        Sector {
+            deleted: false,
+            error: false,
+            data: if data.iter().all(|b| *b==data[0]) {
+                SectorData::Compressed(data[0], data.len())
+            } else {
+                SectorData::Normal(data.to_owned())
+            },
+        }
+    }
+
     pub fn as_bytes(&self) -> anyhow::Result<Vec<u8>> {
         if self.deleted { Err(anyhow!("Reading deleted sector"))? }
         if self.error { Err(anyhow!("Reading sector with data error"))? }
@@ -235,17 +247,8 @@ impl PhysicalBlockDevice for IMD {
         &self.geometry
     }
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
-        let new_sector = Sector {
-            deleted: false,
-            error: false,
-            data: if buf.iter().all(|b| *b==buf[0]) {
-                SectorData::Compressed(buf[0], self.track[cylinder].sector_size)
-            } else {
-                SectorData::Normal(buf.to_owned())
-            },
-        };
         let raw_sector_num = self.track[cylinder].sector_map[sector] as usize - 1;
-        self.track[cylinder].sector_data[raw_sector_num] = new_sector;
+        self.track[cylinder].sector_data[raw_sector_num] = Sector::from_bytes(buf);
         Ok(())
     }
     fn as_vec(&self) -> anyhow::Result<Vec<u8>> {
