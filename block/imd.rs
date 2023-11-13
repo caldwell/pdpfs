@@ -24,7 +24,7 @@ pub struct Track {
     pub sector_data: Vec<Sector>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 #[repr(u8)]
 pub enum Mode {
     M500kbitsFM  = 0,
@@ -73,6 +73,16 @@ impl IMD {
             },
             track: tracks,
         })
+    }
+
+    pub fn repr(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = ByteBuffer::new();
+        buf.write_bytes(&self.comment.as_bytes());
+        buf.write_u8(0x1a); // comment terminator
+        for t in self.track.iter() {
+            buf.write_bytes(&t.repr()?);
+        }
+        Ok(buf.into_vec())
     }
 
     pub fn from_img(img: super::img::IMG)  -> IMD {
@@ -143,6 +153,28 @@ impl Track {
                     }).collect::<anyhow::Result<Vec<Sector>>>()?,
                 })
     }
+
+    pub fn repr(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = ByteBuffer::new();
+        buf.write_u8(self.mode as u8);
+        buf.write_u8(self.cylinder);
+        buf.write_u8(self.head);
+        buf.write_u8(self.sector_count);
+        buf.write_u8(match self.sector_size {
+                         128 => 0,
+                         256 => 1,
+                         512 => 2,
+                        1024 => 3,
+                        2048 => 4,
+                        4096 => 5,
+                        8192 => 6,
+                        s => Err(anyhow!("Bad sector size: {:02x}", s))?});
+        buf.write_bytes(&self.sector_map);
+        for s in self.sector_data.iter() {
+            buf.write_bytes(&s.repr()?);
+        }
+        Ok(buf.into_vec())
+    }
 }
 
 impl Sector {
@@ -159,6 +191,27 @@ impl Sector {
             8 => Sector { deleted: true,  error: true,  data: SectorData::Compressed(buf.read_u8()?, sector_size) },
             t => Err(anyhow!("Bad sector type: {:02x}", t))?,
         })
+    }
+    pub fn repr(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = ByteBuffer::new();
+        buf.write_u8(match self {
+            Sector { deleted: false, error: false, data: SectorData::Unavailable }      => 0,
+            Sector { deleted: false, error: false, data: SectorData::Normal(_) }        => 1,
+            Sector { deleted: false, error: false, data: SectorData::Compressed(_, _) } => 2,
+            Sector { deleted: true,  error: false, data: SectorData::Normal(_) }        => 3,
+            Sector { deleted: true,  error: false, data: SectorData::Compressed(_, _) } => 4,
+            Sector { deleted: false, error: true,  data: SectorData::Normal(_) }        => 5,
+            Sector { deleted: false, error: true,  data: SectorData::Compressed(_, _) } => 6,
+            Sector { deleted: true,  error: true,  data: SectorData::Normal(_) }        => 7,
+            Sector { deleted: true,  error: true,  data: SectorData::Compressed(_, _) } => 8,
+            _ => Err(anyhow!("Can't represent sector! {:?}", self))?,
+        });
+        match self.data {
+            SectorData::Unavailable         => {},
+            SectorData::Normal(ref data)    => buf.write_bytes(&data),
+            SectorData::Compressed(data, _) => buf.write_u8(data),
+        }
+        Ok(buf.into_vec())
     }
 
     pub fn as_bytes(&self) -> anyhow::Result<Vec<u8>> {
@@ -182,12 +235,20 @@ impl PhysicalBlockDevice for IMD {
         &self.geometry
     }
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
-        use pretty_hex::PrettyHex;
-        println!("Writing CHS({},{},{}):\n{:?}", cylinder, head, sector, buf.hex_dump());
-        todo!();
-        //Ok(())
+        let new_sector = Sector {
+            deleted: false,
+            error: false,
+            data: if buf.iter().all(|b| *b==buf[0]) {
+                SectorData::Compressed(buf[0], self.track[cylinder].sector_size)
+            } else {
+                SectorData::Normal(buf.to_owned())
+            },
+        };
+        let raw_sector_num = self.track[cylinder].sector_map[sector] as usize - 1;
+        self.track[cylinder].sector_data[raw_sector_num] = new_sector;
+        Ok(())
     }
     fn as_vec(&self) -> anyhow::Result<Vec<u8>> {
-        todo!()
+        self.repr()
     }
 }
