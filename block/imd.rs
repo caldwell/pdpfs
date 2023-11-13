@@ -1,6 +1,6 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use bytebuffer::ByteBuffer;
 
 
@@ -60,55 +60,7 @@ impl IMD {
 
         let mut tracks: Vec<Track> = vec![];
         while buf.get_rpos() < buf.len() {
-            let sector_count;
-            let sector_size;
-            tracks.push(
-                Track {
-                    mode: match buf.read_u8()? {
-                        0 => Mode::M500kbitsFM,
-                        1 => Mode::M300kbitsFM,
-                        2 => Mode::M250kbitsFM,
-                        3 => Mode::M500kbitsMFM,
-                        4 => Mode::M300kbitsMFM,
-                        5 => Mode::M250kbitsMFM,
-                        m => Err(anyhow!("Bad mode: {:02x} at track {}", m, tracks.len()))?,
-                    },
-                    cylinder: buf.read_u8()?,
-                    head: match buf.read_u8()? {
-                        1 => 1,
-                        0 => 0,
-                        h if h & 0b1000_0000 != 0 => Err(anyhow!("TODO: support Sector Cylinder Map (track {})", tracks.len()))?,
-                        h if h & 0b0100_0000 != 0 => Err(anyhow!("TODO: support Sector head Map (track {})", tracks.len()))?,
-                        h => Err(anyhow!("Bad head: {:02x} at track {}", h, tracks.len()))?,
-                    },
-                    sector_count: {sector_count = buf.read_u8()?; sector_count},
-                    sector_size: {sector_size = match buf.read_u8()? {
-                        0 =>  128,
-                        1 =>  256,
-                        2 =>  512,
-                        3 => 1024,
-                        4 => 2048,
-                        5 => 4096,
-                        6 => 8192,
-                        s => Err(anyhow!("Bad sector size: {:02x} at track {}", s, tracks.len()))?,
-                    }; sector_size},
-                    sector_map: buf.read_bytes(sector_count as usize)?,
-                    sector_data: (0..sector_count).map(|_| -> anyhow::Result<Sector> {
-                        Ok(match buf.read_u8()? {
-                            0 => Sector { deleted: false, error: false, data: SectorData::Unavailable },
-                            1 => Sector { deleted: false, error: false, data: SectorData::Normal(buf.read_bytes(sector_size)?) },
-                            2 => Sector { deleted: false, error: false, data: SectorData::Compressed(buf.read_u8()?, sector_size) },
-                            3 => Sector { deleted: true,  error: false, data: SectorData::Normal(buf.read_bytes(sector_size)?) },
-                            4 => Sector { deleted: true,  error: false, data: SectorData::Compressed(buf.read_u8()?, sector_size) },
-                            5 => Sector { deleted: false, error: true,  data: SectorData::Normal(buf.read_bytes(sector_size)?) },
-                            6 => Sector { deleted: false, error: true,  data: SectorData::Compressed(buf.read_u8()?, sector_size) },
-                            7 => Sector { deleted: true,  error: true,  data: SectorData::Normal(buf.read_bytes(sector_size)?) },
-                            8 => Sector { deleted: true,  error: true,  data: SectorData::Compressed(buf.read_u8()?, sector_size) },
-                            t => Err(anyhow!("Bad sector type: {:02x} at track {}", t, tracks.len()))?,
-                        })
-                    }).collect::<anyhow::Result<Vec<Sector>>>()?,
-                }
-            );
+            tracks.push(Track::from_repr(&mut buf).with_context(|| format!("Track {}", tracks.len()))?);
         }
 
         Ok(IMD {
@@ -153,7 +105,62 @@ impl IMD {
     }
 }
 
+impl Track {
+    pub fn from_repr(buf: &mut ByteBuffer) -> anyhow::Result<Track> {
+            let sector_count;
+            let sector_size;
+                Ok(Track {
+                    mode: match buf.read_u8()? {
+                        0 => Mode::M500kbitsFM,
+                        1 => Mode::M300kbitsFM,
+                        2 => Mode::M250kbitsFM,
+                        3 => Mode::M500kbitsMFM,
+                        4 => Mode::M300kbitsMFM,
+                        5 => Mode::M250kbitsMFM, m => Err(anyhow!("Bad mode: {:02x}", m))?,
+                    },
+                    cylinder: buf.read_u8()?,
+                    head: match buf.read_u8()? {
+                        1 => 1,
+                        0 => 0,
+                        h if h & 0b1000_0000 != 0 => Err(anyhow!("TODO: support Sector Cylinder Map"))?,
+                        h if h & 0b0100_0000 != 0 => Err(anyhow!("TODO: support Sector head Map"))?,
+                        h => Err(anyhow!("Bad head: {:02x}", h))?,
+                    },
+                    sector_count: {sector_count = buf.read_u8()?; sector_count},
+                    sector_size: {sector_size = match buf.read_u8()? {
+                        0 =>  128,
+                        1 =>  256,
+                        2 =>  512,
+                        3 => 1024,
+                        4 => 2048,
+                        5 => 4096,
+                        6 => 8192,
+                        s => Err(anyhow!("Bad sector size: {:02x}", s))?,
+                    }; sector_size},
+                    sector_map: buf.read_bytes(sector_count as usize)?,
+                    sector_data: (0..sector_count).map(|_| -> anyhow::Result<Sector> {
+                        Sector::from_repr(buf, sector_size)
+                    }).collect::<anyhow::Result<Vec<Sector>>>()?,
+                })
+    }
+}
+
 impl Sector {
+    pub fn from_repr(buf: &mut ByteBuffer, sector_size: usize) -> anyhow::Result<Sector> {
+        Ok(match buf.read_u8()? {
+            0 => Sector { deleted: false, error: false, data: SectorData::Unavailable },
+            1 => Sector { deleted: false, error: false, data: SectorData::Normal(buf.read_bytes(sector_size)?) },
+            2 => Sector { deleted: false, error: false, data: SectorData::Compressed(buf.read_u8()?, sector_size) },
+            3 => Sector { deleted: true,  error: false, data: SectorData::Normal(buf.read_bytes(sector_size)?) },
+            4 => Sector { deleted: true,  error: false, data: SectorData::Compressed(buf.read_u8()?, sector_size) },
+            5 => Sector { deleted: false, error: true,  data: SectorData::Normal(buf.read_bytes(sector_size)?) },
+            6 => Sector { deleted: false, error: true,  data: SectorData::Compressed(buf.read_u8()?, sector_size) },
+            7 => Sector { deleted: true,  error: true,  data: SectorData::Normal(buf.read_bytes(sector_size)?) },
+            8 => Sector { deleted: true,  error: true,  data: SectorData::Compressed(buf.read_u8()?, sector_size) },
+            t => Err(anyhow!("Bad sector type: {:02x}", t))?,
+        })
+    }
+
     pub fn as_bytes(&self) -> anyhow::Result<Vec<u8>> {
         if self.deleted { Err(anyhow!("Reading deleted sector"))? }
         if self.error { Err(anyhow!("Reading sector with data error"))? }
