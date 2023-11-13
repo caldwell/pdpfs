@@ -30,6 +30,7 @@ Usage:
   rt11fs [-h] -i <image> rm <file>
   rt11fs [-h] -i <image> init <device-type>
   rt11fs [-h] -i <image> dump [--sector]
+  rt11fs [-h] -i <image> convert <image-type> <dest-file>
 
 Options:
   -h --help              Show this screen.
@@ -61,6 +62,11 @@ Options:
    and must _not_ already exist.
 
    <device-type> must be: rx01
+
+ convert:
+   Convert the image to a different image file type.
+
+   <image-type> must be one of: img, imd
 ";
 
 #[derive(Debug, Deserialize)]
@@ -72,16 +78,25 @@ struct Args {
     cmd_rm:           bool,
     cmd_dump:         bool,
     cmd_init:         bool,
+    cmd_convert:      bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
     arg_file:         PathBuf,
     arg_device_type:  Option<DeviceType>,
+    arg_image_type:   Option<ImageType>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum DeviceType {
     RX01,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+enum ImageType {
+    IMD,
+    IMG,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -109,6 +124,10 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
     // Do this early so we can dump corrupt images (since RT11FS::new() might die).
     if args.cmd_dump {
         return dump(&rx, args.flag_sector);
+    }
+
+    if args.cmd_convert {
+        return convert(&rx, args.arg_image_type.unwrap(), &args.arg_dest_file);
     }
 
     let mut fs = RT11FS::new(rx)?;
@@ -217,6 +236,15 @@ fn init(image: &Path, dtype: DeviceType) -> anyhow::Result<()> {
 fn init_fs<B: BlockDevice>(path: &Path, image: B) -> anyhow::Result<()> {
     let fs = RT11FS::init(image)?;
     save_image(fs.image.physical_device(), path)?;
+    Ok(())
+}
+
+fn convert<B: BlockDevice>(image: &B, image_type: ImageType, dest: &Path) -> anyhow::Result<()> {
+    let (geometry, data) = image.physical_device().to_raw()?;
+    match image_type {
+        ImageType::IMG => save_image(&IMG::from_raw(data, geometry), dest)?,
+        ImageType::IMD => save_image(&IMD::from_raw(data, geometry), dest)?,
+    }
     Ok(())
 }
 
