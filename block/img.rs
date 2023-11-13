@@ -40,7 +40,7 @@ impl PhysicalBlockDevice for IMG {
         &self.geometry
     }
 
-    fn as_vec(&self) -> Vec<u8> {
-        self.data.clone()
+    fn as_vec(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.data.clone())
     }
 }

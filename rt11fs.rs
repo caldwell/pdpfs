@@ -176,7 +176,7 @@ fn cp_into_image<B: BlockDevice>(fs: &mut RT11FS<B>, src: &Path, dest: &Path) ->
 }
 
 fn save_image<P: PhysicalBlockDevice>(dev: &P, filename: &Path) -> anyhow::Result<()> {
-    let new_image = dev.as_vec();
+    let new_image = dev.as_vec()?;
     let newname = filename.append(".new");
     let bakname = filename.append(".bak");
     std::fs::write(&newname, &new_image).with_context(|| format!("{}", newname.to_string_lossy()))?;
