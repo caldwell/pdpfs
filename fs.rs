@@ -74,13 +74,15 @@ impl<B: BlockDevice> RT11FS<B> {
 
     fn read_directory(image: &B, home: &HomeBlock) -> anyhow::Result<Vec<DirSegment>> {
         let mut segments = vec![];
-        let mut segment = home.directory_start_block;
-        while segment != 0 {
-            let next = DirSegment::from_repr(segment, image.read_blocks(segment as usize, 2)?)
-                .with_context(|| format!("Bad Directory Segment #{} (@ {})", segments.len(), segment))?;
+        let mut segment = 0;
+        while {
+            let block = home.directory_start_block + segment*2;
+            let next = DirSegment::from_repr(block, image.read_blocks(block as usize, 2)?)
+                .with_context(|| format!("Bad Directory Segment #{} (@ {})", segments.len(), home.directory_start_block + segment*2))?;
             segment = next.next_segment;
             segments.push(next);
-        }
+            segment != 0
+        } {}
         Ok(segments)
     }
 
