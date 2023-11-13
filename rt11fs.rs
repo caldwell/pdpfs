@@ -39,15 +39,21 @@ Options:
  cp:
    <source-file> and <dest-file> specify local (host) filesystem paths if they
    contain a `/` character. Otherwise they specify files on the image. The
-   filenames will be converted to uppercase for convenience (but they will not be
-   truncated or stripped of other invalid characters).
+   filenames will be converted to uppercase for convenience (but they will not
+   be truncated or stripped of other invalid characters). A plain `.` in the
+   <dest-file> means the same name as the <source-file>, but inside the image
+   (use `./` for the local filesystem).
 
    Examples:
-     # This copies 'file.txt' from the local machine into disk image (as FILE.TXT):
+     # These both copy 'file.txt' from the local machine into disk image (as FILE.TXT):
      rt11fs -i my_image.img cp ./file.txt file.txt
+     rt11fs -i my_image.img cp ./file.txt .
 
      # This copies 'FILE.TXT' from the disk image into /tmp/FILE.TXT on the local machine:
      rt11fs -i my_image.img cp FILE.TXT /tmp
+
+     # This copies 'FILE.TXT' from the image into './file.txt' on the local machine:
+     rt11fs -i my_image.img cp file.txt ./
 
  rm:
    <file> will be deleted from the image.
@@ -137,8 +143,8 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
     }
 
     if args.cmd_cp {
-        match (args.arg_source_file.components().count() > 1,
-               args.arg_dest_file.components().count() > 1) {
+        match (args.arg_source_file.to_string_lossy().chars().find(|c| std::path::is_separator(*c)).is_some(),
+               args.arg_dest_file  .to_string_lossy().chars().find(|c| std::path::is_separator(*c)).is_some()) {
             (false, true)  => cp_from_image(&fs, &args.arg_source_file, &args.arg_dest_file)?,
             (true,  false) => { cp_into_image(&mut fs, &args.arg_source_file, &args.arg_dest_file)?;
                                 save_image(fs.image.physical_device(), &args.flag_image)? },
@@ -187,6 +193,10 @@ fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> any
 
 fn cp_into_image<B: BlockDevice>(fs: &mut RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
     let m = src.metadata()?;
+    let dest = match dest {
+        d if d == Path::new(".") => Path::new(src.file_name().ok_or_else(|| anyhow!("Need source filename to use '.'"))?),
+        d => d,
+    };
     let mut fh = fs.create(&path_to_rt11_filename(dest)?,
                            m.len() as usize)?;
     let buf = std::fs::read(src)?;
