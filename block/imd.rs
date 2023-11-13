@@ -247,7 +247,8 @@ impl PhysicalBlockDevice for IMD {
     fn geometry(&self) -> &Geometry {
         &self.geometry
     }
-    fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
+    fn write_sector(&mut self, cylinder: usize, _head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
+        // FIXME: need to pay attention to head here.
         let raw_sector_num = self.track[cylinder].sector_map[sector] as usize - 1;
         self.track[cylinder].sector_data[raw_sector_num] = Sector::from_bytes(buf);
         Ok(())
