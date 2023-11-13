@@ -166,6 +166,7 @@ impl<B: BlockDevice> RT11FS<B> {
         if entry > 0 {
             self.coalesce_empty(segment, entry-1);
         }
+        self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)?;
         Ok(())
     }
 
@@ -599,19 +600,26 @@ mod test {
     }
 
     macro_rules! assert_block_eq {
-        ($image:expr, $block_num:expr, $( $expected:expr ),*) => {
+        ($image:expr, $block_num:expr, $( $expected_and_mask:expr ),*) => {
             {
                 let got = $image.read_blocks($block_num, 1).expect(&format!("block {}", $block_num));
-                let mut expected = Vec::new();
-                $(expected.extend($expected);)*
-                if got.as_bytes() != expected {
-                    panic!("assertion `block {0} == expected` failed\n  Block {0} was:\n{1:?} \n Expected:\n{2:?}\n",
-                        $block_num, got.as_bytes().hex_dump(), expected.hex_dump());
+                let mut expected_and_mask: Vec<u16> = Vec::new();
+                $( {
+                    expected_and_mask.extend($expected_and_mask.into_iter().map(|v| v as u16));
+                } )*
+                // We encode the inverse mask into the high byte of a u16--that way simple u8s are treated as 0xff.
+                // The ____ const, below, sets the high byte of the mask so that is becomes 0x00 when we invert it.
+                let expected: Vec<u8> = expected_and_mask.iter().map(|x| (x & 0xff) as u8).collect();
+                let mask: Vec<u8> = expected_and_mask.iter().map(|x| !(x >> 8) as u8).collect();
+                let masked: Vec<u8> = got.as_bytes().iter().zip(&mask).map(|(data, mask)| data & mask).collect();
+                if masked != expected {
+                    panic!("assertion `block {0} == expected` failed\n  Block {0} was:\n{1:?} \n Expected:\n{2:?}\n Mask:\n{3:?}",
+                        $block_num, got.as_bytes().hex_dump(), expected.hex_dump(), mask.hex_dump());
                 }
             }
         };
     }
-
+    const ____: u16 = 0xff00;
 
     #[test]
     fn test_init() {
@@ -709,6 +717,10 @@ mod test {
         fs.delete("TEST.TXT").expect("delete test.txt");
         assert_eq!(fs.file_named("TEST.TXT"), None);
         assert_eq!(fs.used_blocks(), 0);
+        assert_block_eq!(fs.image, 6,
+            vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x02, ____, ____, ____, ____,
+                 ____, ____, 0x06, 0x00, 0x00, 0x00, ____, ____, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+            vec![0; 512-32]);
     }
 
     #[test]
