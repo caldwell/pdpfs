@@ -120,7 +120,7 @@ fn main() -> anyhow::Result<()> {
         (magic, _) if magic == "IMD".as_bytes() => with_physical_dev(&args, IMD::from_bytes(&image)?),
         (_, 256256) => with_physical_dev(&args, IMG::from_vec(image, RX01_GEOMETRY)),
         (_, 512512) => with_physical_dev(&args, IMG::from_vec(image, RX02_GEOMETRY)),
-        (magic, len) => return Err(anyhow!("Unknown image (magic number: {:x?}, length: {})", magic, len)),
+        (magic, len) => return Err(anyhow!("Unknown image type (magic number: {:x?}, length: {})", magic, len)),
     }
 }
 
