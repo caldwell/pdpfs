@@ -597,6 +597,7 @@ mod test {
         fn read_sector(&self, _cylinder: usize, _head: usize, _sector: usize) -> anyhow::Result<Vec<u8>> {unimplemented!()}
         fn write_sector(&mut self, _cylinder: usize, _head: usize, _sector: usize, _buf: &[u8]) -> anyhow::Result<()> {unimplemented!()}
         fn as_vec(&self) -> anyhow::Result<Vec<u8>> {unimplemented!()}
+        fn from_raw(_data: Vec<u8>, _geometry: crate::block::Geometry) -> Self { unimplemented!() }
     }
 
     macro_rules! assert_block_eq {

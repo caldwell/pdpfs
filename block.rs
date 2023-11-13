@@ -44,9 +44,24 @@ pub trait PhysicalBlockDevice {
     fn read_sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn as_vec(&self) -> anyhow::Result<Vec<u8>>;
+
+    fn from_raw(data: Vec<u8>, geometry: Geometry) -> Self;
+
+    fn to_raw(&self) -> anyhow::Result<(Geometry, Vec<u8>)> {
+        let g = self.geometry();
+        let mut raw = Vec::with_capacity(g.cylinders * g.heads * g.sectors * g.sector_size);
+        for c in 0..g.cylinders {
+            for h in 0..g.heads {
+                for s in 0..g.sectors {
+                    raw.extend(self.read_sector(c,h,s)?.iter());
+                }
+            }
+        }
+        Ok((*g, raw))
+    }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct Geometry {
     pub cylinders: usize,
     pub heads: usize,

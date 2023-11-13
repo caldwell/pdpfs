@@ -207,8 +207,8 @@ fn rm<B: BlockDevice>(fs: &mut RT11FS<B>, file: &Path) -> anyhow::Result<()> {
 fn init(image: &Path, dtype: DeviceType) -> anyhow::Result<()> {
     let ext = image.extension().and_then(|oss| oss.to_str());
     match (dtype, ext) {
-        (DeviceType::RX01, Some("img")) => return init_fs(image, RX(IMG::from_bytes(&[0; 256256], RX01_GEOMETRY))),
-        (DeviceType::RX01, Some("imd")) => return init_fs(image, RX(IMD::from_img(IMG::from_bytes(&[0; 256256], RX01_GEOMETRY)))),
+        (DeviceType::RX01, Some("img")) => return init_fs(image, RX(IMG::from_raw(vec![0; 256256], RX01_GEOMETRY))),
+        (DeviceType::RX01, Some("imd")) => return init_fs(image, RX(IMD::from_raw(vec![0; 256256], RX01_GEOMETRY))),
         (DeviceType::RX01, Some(ext)) => return Err(anyhow!("Unknown image type {}", ext)),
         (DeviceType::RX01, None)      => return Err(anyhow!("Unknown image type for {}", image.to_string_lossy())),
     }

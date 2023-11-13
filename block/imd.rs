@@ -85,14 +85,12 @@ impl IMD {
         Ok(buf.into_vec())
     }
 
-    pub fn from_img(img: super::img::IMG)  -> IMD {
-        let g = img.geometry().clone();
+    pub fn from_raw_bytes(data: Vec<u8>, g: Geometry)  -> IMD {
         IMD {
             comment: format!("IMD 1.18: {}\nConverted from IMG by rt11fs[1]\n[1]: https://porkrind.org/rt11fs\n",
                 chrono::Local::now().format("%m/%d/Y %H:%M:%S")),
             track: (0..g.cylinders).map(|c| {
-                let c = c;
-                (0..g.heads).map(move |h| {
+                (0..g.heads).map(|h| {
                     Track {
                         mode: Mode::M250kbitsFM, // FIXME!!! Don't hardcode this!
                         cylinder: c as u8,
@@ -100,15 +98,15 @@ impl IMD {
                         sector_count: g.sectors as u8,
                         sector_size: g.sector_size,
                         sector_map: (0..g.sectors).map(|s| (s+1) as u8).collect(),
-                        sector_data: (0..g.sectors).map(|_| {
-                            Sector {
-                                data: SectorData::Compressed(0, g.sector_size),
-                                deleted: false,
-                                error: false,
-                            }
+                        sector_data: (0..g.sectors).map(|s| {
+                            let start = c * g.sectors * g.heads +
+                                        h * g.sectors +
+                                        s;
+                            let sector = &data[start * g.sector_size..(start+1) * g.sector_size];
+                            Sector::from_bytes(sector)
                         }).collect(),
                     }
-                })
+                }).collect::<Vec<Track>>()
             }).flatten().collect(),
             geometry: g,
         }
@@ -240,6 +238,9 @@ impl Sector {
 }
 
 impl PhysicalBlockDevice for IMD {
+    fn from_raw(data: Vec<u8>, geometry: Geometry) -> Self {
+        IMD::from_raw_bytes(data, geometry)
+    }
     fn read_sector(&self, cylinder: usize, _head: usize, sector: usize) -> anyhow::Result<Vec<u8>> {
         Ok(self.track[cylinder].sector_data[self.track[cylinder].sector_map[sector] as usize - 1].as_bytes()?)
     }
