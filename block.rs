@@ -2,6 +2,7 @@
 
 // Logical Devices
 pub mod rx;
+pub mod flat;
 
 // Physical Images
 pub mod img;
@@ -41,6 +42,10 @@ pub trait BlockDevice {
 
 pub trait PhysicalBlockDevice {
     fn geometry(&self) -> &Geometry;
+    fn total_bytes(&self) -> usize {
+        let g = self.geometry();
+        g.cylinders * g.heads * g.sectors * g.sector_size
+    }
     fn read_sector(&self, cylinder: usize, head: usize, sector: usize) -> anyhow::Result<Vec<u8>>;
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn as_vec(&self) -> anyhow::Result<Vec<u8>>;

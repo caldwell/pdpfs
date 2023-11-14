@@ -7,7 +7,7 @@ This is a CLI app designed to move files on and off of RT-11 filesystems. It
 can read and write IMD image files and flat binary image files (often just
 called ".img").
 
-It currently only supports RX-01 images.
+It currently supports RX-01 images and flat hard disk images over 1MB.
 
 Find the latest version at https://porkrind.org/rt11fs
 
