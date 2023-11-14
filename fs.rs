@@ -1,6 +1,6 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-use std::{cmp::min, io, io::ErrorKind};
+use std::{cmp::min, io, io::ErrorKind, fmt::Debug};
 
 use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
@@ -9,7 +9,7 @@ use chrono::NaiveDate;
 #[cfg(not(test))] use chrono::Local;
 #[cfg    (test)]  use test::Local;
 
-//use pretty_hex::PrettyHex;
+use pretty_hex::PrettyHex;
 
 use crate::block::{BlockDevice, BLOCK_SIZE};
 
@@ -187,7 +187,7 @@ impl<B: BlockDevice> RT11FS<B> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct HomeBlock {
     pub bad_block_replacement_table: [u8; 130],
     pub init_restore: [u8; 38],
@@ -243,6 +243,46 @@ impl HomeBlock {
     }
 }
 
+impl Debug for HomeBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, r#"bad_block_replacement_table:
+{:?}
+init_restore:
+{:?}
+bup_volume            : {:?},
+pack_cluster_size     : {:#08o} {:#06x} {},
+directory_start_block : {:#08o} {:#06x} {},
+system_version        : {:#08o} {:?},
+volume_id             : {:?},
+owner_name            : {:?},
+system_id             : {:?},
+"#,
+            &self.bad_block_replacement_table.hex_dump(),
+            &self.init_restore.hex_dump(),
+            &self.bup_volume,
+            &self.pack_cluster_size, &self.pack_cluster_size, &self.pack_cluster_size,
+            &self.directory_start_block, &self.directory_start_block, &self.directory_start_block,
+            radix50::pdp11::encode_word(&self.system_version).unwrap(), &self.system_version,
+            &self.volume_id,
+            &self.owner_name,
+            &self.system_id)
+        } else {
+            f.debug_struct("HomeBlock")
+                .field("bad_block_replacement_table", &self.bad_block_replacement_table)
+                .field("init_restore",                &self.init_restore          )
+                .field("bup_volume",                  &self.bup_volume            )
+                .field("pack_cluster_size",           &self.pack_cluster_size     )
+                .field("directory_start_block",       &self.directory_start_block )
+                .field("system_version",              &self.system_version        )
+                .field("volume_id",                   &self.volume_id             )
+                .field("owner_name",                  &self.owner_name            )
+                .field("system_id",                   &self.system_id             )
+                .finish()
+        }
+    }
+}
+
 const STATUS_E_TENT: u16 = 0o000400;
 const STATUS_E_MPTY: u16 = 0o001000;
 const STATUS_E_PERM: u16 = 0o002000;
@@ -251,7 +291,7 @@ const STATUS_E_READ: u16 = 0o040000;
 const STATUS_E_PROT: u16 = 0o100000;
 const STATUS_E_PRE:  u16 = 0o000020;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DirSegment {
     pub segments: u16,
     pub next_segment: u16,
@@ -350,6 +390,24 @@ impl DirSegment {
     }
 }
 
+impl Debug for DirSegment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, r#"Directory Segment {0} header:
+    segments     : {1:#08o} {1:#06x} {1},
+    next_segment : {2:#08o} {2:#06x} {2},
+    last_segment : {3:#08o} {3:#06x} {3},
+    extra_bytes  : {4:#08o} {4:#06x} {4},
+    data_block   : {5:#08o} {5:#06x} {5}
+"#, self.block/2, self.segments, self.next_segment, self.last_segment, self.extra_bytes, self.data_block)?;
+        if f.alternate() {
+            write!(f, "entries: {}\n", self.entries.len())?;
+            for e in self.entries.iter() {
+                write!(f, "{:#?}\n", e)?;
+            }
+        }
+        Ok(())
+    }
+}
 pub struct DirSegmentIterator<'a, B: BlockDevice> {
     image: &'a B,
     directory_start_block: u16,
@@ -381,7 +439,7 @@ impl<'a, B: BlockDevice> Iterator for DirSegmentIterator<'a, B> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct DirEntry {
     pub kind: EntryKind,
     pub read_only: bool,
@@ -501,6 +559,36 @@ impl DirEntry {
             _ => Some(chrono::NaiveDate::from_ymd_opt(1972 + year + age * 32, month, day)
                           .ok_or(anyhow!("Invalid date: {:04}-{:02}-{:02} [{}/{:#06x}/{:#018b}]", year, month, day, raw, raw, raw))?),
            })
+    }
+}
+
+impl Debug for DirEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            use join_string::Join;
+            write!(f, "{:<9} {}{}{} {:>3}:{:<3} {:<10} [{:#06x}] {:5} @ {:<5} {}",
+                 match self.kind { EntryKind::Permanent => "Permanent",
+                                   EntryKind::Empty     => "Empty",
+                                   EntryKind::Tentative => "Tentative"
+                 },
+                 if self.read_only    { "R" } else { "-" },
+                 if self.protected    { "P" } else { "-" },
+                 if self.prefix_block { "p" } else { "-" },
+                 self.job,
+                 self.channel,
+                 self.creation_date.map(|d| format!("{}", d)).unwrap_or(format!(" No Date")), DirEntry::encode_date(self.creation_date).unwrap_or(0xffff),
+                 self.length,
+                 self.block,
+                 if self.extra.is_empty() { format!("{}", self.name) } else { format!("{:<10} [{}]", self.name, self.extra.iter().map(|e| format!("{:#6x}", e)).join(",")) }
+            )
+        } else {
+            write!(f, "{:10} {:6} {}", self.creation_date.map(|d| d.to_string()).unwrap_or(" No Date".to_string()),
+                self.length,
+                match self.kind { EntryKind::Permanent => format!("{}", self.name),
+                                  EntryKind::Empty     => format!(" <empty>  was {}", self.name),
+                                  EntryKind::Tentative => format!("{:10} (tentative)", self.name),
+                })
+        }
     }
 }
 

@@ -163,7 +163,7 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
 
 fn ls<B: BlockDevice>(fs: &RT11FS<B>) {
     for f in fs.file_iter() {
-        println!("{:10} {:>3}:{:<3} {:6} {}", f.creation_date.map(|d| d.to_string()).unwrap_or("<no-date>".to_string()), f.job, f.channel, f.length, f.name);
+        println!("{:?}", f),
     }
     let free_blocks = fs.free_blocks();
     let used_blocks = fs.used_blocks();

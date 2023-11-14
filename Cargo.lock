@@ -136,6 +136,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "join-string"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c256ea1b86607a462e2b82a3d3f429897f1695dbbe2a3805dcdd029f734fc12"
+
+[[package]]
 name = "js-sys"
 version = "0.3.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -253,6 +259,7 @@ dependencies = [
  "bytebuffer",
  "chrono",
  "docopt",
+ "join-string",
  "pretty-hex",
  "radix50",
  "serde",
