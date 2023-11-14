@@ -25,7 +25,7 @@ use crate::block::BLOCK_SIZE;
 const USAGE: &'static str = "
 Usage:
   rt11fs -h
-  rt11fs [-h] -i <image> ls
+  rt11fs [-h] -i <image> ls [-l] [-a]
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
   rt11fs [-h] -i <image> rm <file>
   rt11fs [-h] -i <image> init <device-type>
@@ -35,6 +35,13 @@ Usage:
 Options:
   -h --help              Show this screen.
   -i --image <image>     Use <image> as the disk image.
+
+ ls:
+   -a --all              List all entries, not just 'permanents'
+   -l --long             Give a more detailed output. All directory entry fields in
+                         the filesystem are printed and not just the most useful.
+
+   List files in the image.
 
  cp:
    <source-file> and <dest-file> specify local (host) filesystem paths if they
@@ -79,6 +86,8 @@ Options:
 struct Args {
     flag_image:       PathBuf,
     flag_sector:      bool,
+    flag_long:        bool,
+    flag_all:         bool,
     cmd_ls:           bool,
     cmd_cp:           bool,
     cmd_rm:           bool,
@@ -139,7 +148,7 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
     let mut fs = RT11FS::new(rx)?;
 
     if args.cmd_ls {
-        ls(&fs);
+        ls(&fs, args.flag_long, args.flag_all);
     }
 
     if args.cmd_cp {
@@ -161,9 +170,13 @@ fn with_physical_dev<P: PhysicalBlockDevice>(args: &Args, dev: P) -> anyhow::Res
     Ok(())
 }
 
-fn ls<B: BlockDevice>(fs: &RT11FS<B>) {
-    for f in fs.file_iter() {
-        println!("{:?}", f),
+fn ls<B: BlockDevice>(fs: &RT11FS<B>, long: bool, all: bool) {
+    for f in if all { Box::new(fs.dir_iter()) as Box<dyn Iterator<Item = &fs::DirEntry>> }
+             else   { Box::new(fs.file_iter()) as Box<dyn Iterator<Item = &fs::DirEntry>> } {
+        match long {
+            false => println!("{:?}", f),
+            true  => println!("{:#?}", f),
+        }
     }
     let free_blocks = fs.free_blocks();
     let used_blocks = fs.used_blocks();

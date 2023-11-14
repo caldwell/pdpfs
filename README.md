@@ -14,7 +14,7 @@ Find the latest version at https://porkrind.org/rt11fs
 ## Usage
 
     rt11fs -h
-    rt11fs [-h] -i <image> ls
+    rt11fs [-h] -i <image> ls [-l] [-a]
     rt11fs [-h] -i <image> cp <source-file> <dest-file>
     rt11fs [-h] -i <image> rm <file>
     rt11fs [-h] -i <image> init <device-type>
@@ -27,6 +27,14 @@ Find the latest version at https://porkrind.org/rt11fs
     -i --image <image>     Use <image> as the disk image.
 
 ### Commands:
+
+#### `ls [-l] [-a]`
+
+    -a --all              List all entries, not just 'permanents'
+    -l --long             Give a more detailed output. All directory entry fields in
+                          the filesystem are printed and not just the most useful.
+
+List files in the image.
 
 #### `cp <source-file> <dest-file>`
 
