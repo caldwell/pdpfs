@@ -19,6 +19,8 @@ Find the latest version at https://porkrind.org/rt11fs
     rt11fs [-h] -i <image> rm <file>
     rt11fs [-h] -i <image> init <device-type>
     rt11fs [-h] -i <image> dump [--sector]
+    rt11fs [-h] -i <image> dump-home
+    rt11fs [-h] -i <image> dump-dir
     rt11fs [-h] -i <image> convert <image-type> <dest-file>
 
 ### Options:
@@ -65,7 +67,15 @@ Examples:
 
     -s --sector            Dump by blocks instead of sectors
 
-Dumps the image, de-interleaving floppy images.
+Print a hex dump of the logical blocks of the image, de-interleaving floppy images.
+
+#### `dump-home`
+
+Print a debug dump of the fields of the home block.
+
+#### `dump-dir`
+
+Print a debug dump of the fields of the directory segments.
 
 #### `init <device-type>`
 

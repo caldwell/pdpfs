@@ -31,6 +31,8 @@ Usage:
   rt11fs [-h] -i <image> rm <file>
   rt11fs [-h] -i <image> init <device-type>
   rt11fs [-h] -i <image> dump [--sector]
+  rt11fs [-h] -i <image> dump-home
+  rt11fs [-h] -i <image> dump-dir
   rt11fs [-h] -i <image> convert <image-type> <dest-file>
 
 Options:
@@ -93,6 +95,8 @@ struct Args {
     cmd_cp:           bool,
     cmd_rm:           bool,
     cmd_dump:         bool,
+    cmd_dump_home:    bool,
+    cmd_dump_dir:     bool,
     cmd_init:         bool,
     cmd_convert:      bool,
     arg_source_file:  PathBuf,
@@ -150,6 +154,14 @@ fn with_block_dev<B: BlockDevice>(args: &Args, dev: B) -> anyhow::Result<()> {
     // Do this early so we can dump corrupt images (since RT11FS::new() might die).
     if args.cmd_dump {
         return dump(&dev, args.flag_sector);
+    }
+
+    if args.cmd_dump_home {
+        return dump_home(&dev);
+    }
+
+    if args.cmd_dump_dir {
+        return dump_dir(&dev);
     }
 
     if args.cmd_convert {
@@ -248,6 +260,48 @@ fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
     } else {
         for b in 0..image.blocks() {
             println!("Block {}\n{:?}", b, image.read_blocks(b, 1)?.as_bytes().hex_dump());
+        }
+    }
+    Ok(())
+}
+
+fn dump_home<B: BlockDevice>(image: &B) -> anyhow::Result<()> {
+    let home = RT11FS::read_homeblock(image)?;
+    println!("{:#?}", home);
+    Ok(())
+}
+
+fn dump_dir<B: BlockDevice>(image: &B) -> anyhow::Result<()> {
+    let segment_block = RT11FS::read_homeblock(image).map(|home| home.directory_start_block).unwrap_or(6);
+
+    for (num, segment) in fs::RT11FS::read_directory(image, segment_block).enumerate() {
+        match segment {
+            Ok(segment) => println!("{:#?}", segment),
+            Err(e) => {
+                // This is for debug purposes. Try to dump as much possible without erroring out
+                println!("Error reading segment {}: {:#}. Raw Dump:", num, e);
+
+                let mut buf = image.read_blocks((segment_block + num as u16 * 2) as usize, 2)?;
+                buf.set_endian(bytebuffer::Endian::LittleEndian);
+
+                let seg = fs::DirSegment {
+                    segments: buf.read_u16()?,
+                    next_segment: buf.read_u16()?,
+                    last_segment: buf.read_u16()?,
+                    extra_bytes: buf.read_u16()?,
+                    data_block: buf.read_u16()?,
+                    entries: vec![],
+                    block: segment_block,
+                };
+                println!("{:?}", seg);
+                for entry in 0..(512-5)/7 {
+                    print!("Directory Entry {}: ", entry);
+                    for w in 0..7 {
+                        print!("{}{:#08o}", if w == 0 { "" } else { "," }, buf.read_u16()?);
+                    }
+                    println!("");
+                }
+            }
         }
     }
     Ok(())
