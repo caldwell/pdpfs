@@ -23,7 +23,7 @@ pub struct RT11FS<B: BlockDevice> {
 impl<B: BlockDevice> RT11FS<B> {
     pub fn new(image: B) -> anyhow::Result<RT11FS<B>> {
         let home = Self::read_homeblock(&image)?;
-        let dir = Self::read_directory(&image, &home)?;
+        let dir = Self::read_directory(&image, home.directory_start_block).collect::<anyhow::Result<Vec<DirSegment>>>()?;
         Ok(RT11FS {
             image,
             home,
@@ -72,18 +72,12 @@ impl<B: BlockDevice> RT11FS<B> {
         Ok(hb)
     }
 
-    fn read_directory(image: &B, home: &HomeBlock) -> anyhow::Result<Vec<DirSegment>> {
-        let mut segments = vec![];
-        let mut segment = 0;
-        while {
-            let block = home.directory_start_block + segment*2;
-            let next = DirSegment::from_repr(block, image.read_blocks(block as usize, 2)?)
-                .with_context(|| format!("Bad Directory Segment #{} (@ {})", segments.len(), home.directory_start_block + segment*2))?;
-            segment = next.next_segment;
-            segments.push(next);
-            segment != 0
-        } {}
-        Ok(segments)
+    pub fn read_directory<'a>(image: &'a B, directory_start_block: u16) -> DirSegmentIterator<'a, B> {
+        DirSegmentIterator {
+            image,
+            directory_start_block: directory_start_block,
+            next_segment: Some(0),
+        }
     }
 
     pub fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, B> {
@@ -353,6 +347,37 @@ impl DirSegment {
         // subtracting it off the top and then only having 2 reserved
         // entries. I believe this is more correct.
         (BLOCK_SIZE * SEGMENT_BLOCKS - SEGMENT_HEADER_BYTES - SEGMENT_END_MARKER_BYTES) / (DIR_ENTRY_BYTES + self.extra_bytes as usize) - RESERVED_ENTRIES
+    }
+}
+
+pub struct DirSegmentIterator<'a, B: BlockDevice> {
+    image: &'a B,
+    directory_start_block: u16,
+    next_segment: Option<u16>,
+}
+
+impl<'a, B: BlockDevice> DirSegmentIterator<'a, B> {
+    fn segment(&self, segment: u16) -> anyhow::Result<DirSegment> {
+        let block = self.directory_start_block + segment*2;
+        Ok(DirSegment::from_repr(block, self.image.read_blocks(block as usize, 2)?)
+            .with_context(|| format!("Bad Directory Segment #{} (@ {})", segment, self.directory_start_block + segment*2))?)
+    }
+}
+
+impl<'a, B: BlockDevice> Iterator for DirSegmentIterator<'a, B> {
+    type Item = anyhow::Result<DirSegment>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Some(next_segment) = self.next_segment else {
+            return None
+        };
+        let (next, segment) = match self.segment(next_segment) {
+            Ok(segment) => (match segment.next_segment { 0 => None, s => Some(s) },
+                            Ok(segment)),
+            Err(e) => (None, Err(e))
+        };
+        self.next_segment = next;
+        Some(segment)
     }
 }
 
