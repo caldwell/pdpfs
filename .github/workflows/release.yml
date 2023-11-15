@@ -16,6 +16,10 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
+
+    - name: Use Nightly Rust
+      run: rustup default nightly
+
     - name: Prepare cross compiler
       run: |
         brew install mingw-w64
