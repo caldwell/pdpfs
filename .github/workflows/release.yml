@@ -57,7 +57,7 @@ jobs:
         zip -r $PROJECT_NAME-macos-$VERSION.zip   $PROJECT_NAME-macos-$VERSION
 
     - name: Generate Changelog Snippet
-      run: perl -nE 'BEGIN { $v=shift } $p = $v eq $1 if /^# (.*)/; print if $p' "${{ github.ref_name }}" Changelog.md > release.changelog
+      run: perl -nE 'BEGIN { $v=shift } print if (/^# $v/.../^# (.*)/) && !/^#/' "${{ github.ref_name }}" Changelog.md > release.changelog
 
     - name: Create Release
       id: create_release
