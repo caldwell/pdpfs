@@ -6,8 +6,7 @@ on:
 
 env:
   PROJECT_NAME: rt11fs
-  # Comma separated:
-  BIN_NAMES: rt11fs
+  BIN_NAME: rt11fs
   CARGO_TERM_COLOR: always
   VERSION: ${{ github.ref_name }}
 
@@ -41,7 +40,7 @@ jobs:
 
     - name: Build
       run: |
-        for bin in $(echo $BIN_NAMES | tr , ' '); do
+        for bin in $BIN_NAME; do
           cargo build --bin "$bin" --verbose --release
           cargo build --bin "$bin" --verbose --release --target aarch64-apple-darwin
           cargo build --bin "$bin" --verbose --release --target x86_64-pc-windows-gnu
@@ -52,8 +51,8 @@ jobs:
       run: |
         rm -rf ./$PROJECT_NAME-windows-$VERSION ./$PROJECT_NAME-macos-$VERSION ./$PROJECT_NAME-windows-$VERSION.zip ./$PROJECT_NAME-macos-$VERSION.zip
         mkdir ./$PROJECT_NAME-windows-$VERSION ./$PROJECT_NAME-macos-$VERSION
-        cp README.md Changelog.md LICENSE.md ./target/x86_64-pc-windows-gnu/release/{$BIN_NAMES}.exe ./$PROJECT_NAME-windows-$VERSION
-        cp README.md Changelog.md LICENSE.md ./target/{$BIN_NAMES}                                   ./$PROJECT_NAME-macos-$VERSION
+        cp README.md Changelog.md LICENSE.md ./target/x86_64-pc-windows-gnu/release/$BIN_NAME.exe ./$PROJECT_NAME-windows-$VERSION
+        cp README.md Changelog.md LICENSE.md ./target/$BIN_NAME                                   ./$PROJECT_NAME-macos-$VERSION
         zip -r $PROJECT_NAME-windows-$VERSION.zip $PROJECT_NAME-windows-$VERSION
         zip -r $PROJECT_NAME-macos-$VERSION.zip   $PROJECT_NAME-macos-$VERSION
 
