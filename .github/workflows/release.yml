@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags: [ "[0-9]*" ]
+
+env:
+  PROJECT_NAME: rt11fs
+  BIN_NAMES: rt11fs
+  CARGO_TERM_COLOR: always
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  build:
+    runs-on: macos-13-arm
+    steps:
+    - uses: actions/checkout@v3
+    - name: Prepare cross compiler
+      run: |
+        brew install mingw-w64
+        rustup target add x86_64-pc-windows-gnu
+
+    - name: Cache Rust Crates and Objects
+      uses: actions/cache@v3
+      with:
+        key: rust-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          rust-
+        path: |
+          ~/.cargo
+          ./target
+
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Build
+      run: |
+        cargo build --verbose --release
+        cargo build --verbose --release --target x86_64-pc-windows-gnu
+
+    - name: Package
+      run: |
+        rm -rf ./$PROJECT_NAME-windows-$VERSION ./$PROJECT_NAME-macos-$VERSION ./$PROJECT_NAME-windows-$VERSION.zip ./$PROJECT_NAME-macos-$VERSION.zip
+        mkdir ./$PROJECT_NAME-windows-$VERSION ./$PROJECT_NAME-macos-$VERSION
+        cp README.md Changelog.md LICENSE.md ./target/x86_64-pc-windows-gnu/release/{$BIN_NAMES}.exe ./$PROJECT_NAME-windows-$VERSION
+        cp README.md Changelog.md LICENSE.md ./target/release/{$BIN_NAMES}                           ./$PROJECT_NAME-macos-$VERSION
+        zip -r $PROJECT_NAME-windows-$VERSION.zip $PROJECT_NAME-windows-$VERSION
+        zip -r $PROJECT_NAME-macos-$VERSION.zip   $PROJECT_NAME-macos-$VERSION
+
+    - name: Generate Changelog Snippet
+      run: perl -nE 'BEGIN { $v=shift } $p = $v eq $1 if /^# (.*)/; print if $p' "${{ github.ref_name }}" Changelog.md > release.changelog
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release.changelog
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fail_on_unmatched_files: true
+        files: |
+          ${{ env.PROJECT_NAME }}-windows-${{ env.VERSION }}.zip
+          ${{ env.PROJECT_NAME }}-macos-${{ env.VERSION }}.zip
