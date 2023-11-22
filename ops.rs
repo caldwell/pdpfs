@@ -2,11 +2,12 @@
 
 // Various operations we can do on disk image file systems
 
-use crate::block::{BlockDevice, PhysicalBlockDevice, BLOCK_SIZE};
+use crate::block::{BlockDevice, PhysicalBlockDevice, BLOCK_SIZE, Geometry};
+use crate::block::flat::Flat;
 use crate::block::imd::IMD;
 use crate::block::img::IMG;
-use crate::block::rx::{RX, RX01_GEOMETRY};
-use crate::fs::{DirEntry,DirSegment,RT11FS};
+use crate::block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
+use crate::fs::{DirEntry,DirSegment,RT11FS,FileSystem};
 
 use std::fs::rename;
 use std::io::Write;
@@ -27,6 +28,28 @@ pub enum DeviceType {
 pub enum ImageType {
     IMD,
     IMG,
+}
+
+pub fn open_device(image_file: &Path) -> anyhow::Result<Box<dyn BlockDevice>> {
+    let image = std::fs::read(image_file)?;
+    Ok(match (&image[0..3], image.len()) {
+        (magic, _) if magic == "IMD".as_bytes() => {
+            let imd = IMD::from_bytes(&image)?;
+            match imd.total_bytes() {
+                bytes if bytes < 1024*1024 => Box::new(RX(imd)),
+                _                          => Box::new(Flat(imd))
+            }
+        },
+        (_, 256256) => Box::new(RX(IMG::from_vec(image, RX01_GEOMETRY))),
+        (_, 512512) => Box::new(RX(IMG::from_vec(image, RX02_GEOMETRY))),
+        (_, len) if len >= 1024*1024 => Box::new(Flat(IMG::from_vec(image, Geometry {
+            cylinders: 1,
+            heads: 1,
+            sectors: len/512,
+            sector_size: 512,
+        }))),
+        (magic, len) => return Err(anyhow!("Unknown image type (magic number: {:x?}, length: {})", magic, len)),
+    })
 }
 
 pub fn ls(fs: &impl FileSystem, long: bool, all: bool) {

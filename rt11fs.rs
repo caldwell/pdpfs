@@ -8,11 +8,7 @@ mod ops;
 
 use std::path::PathBuf;
 
-use block::{BlockDevice, PhysicalBlockDevice};
-use block::imd::IMD;
-use block::img::IMG;
-use block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
-use block::flat::Flat;
+use block::BlockDevice;
 use fs::RT11FS;
 use ops::*;
 
@@ -113,28 +109,8 @@ fn main() -> anyhow::Result<()> {
         return init(&args.flag_image, args.arg_device_type.unwrap());
     }
 
-    let image = std::fs::read(&args.flag_image)?;
-    match (&image[0..3], image.len()) {
-        (magic, _) if magic == "IMD".as_bytes() => {
-            let imd = IMD::from_bytes(&image)?;
-            match imd.total_bytes() {
-                bytes if bytes < 1024*1024 => with_block_dev(&args, RX(imd)),
-                _                          => with_block_dev(&args, Flat(imd))
-            }
-        },
-        (_, 256256) => with_block_dev(&args, RX(IMG::from_vec(image, RX01_GEOMETRY))),
-        (_, 512512) => with_block_dev(&args, RX(IMG::from_vec(image, RX02_GEOMETRY))),
-        (_, len) if len >= 1024*1024 => with_block_dev(&args, Flat(IMG::from_vec(image, block::Geometry {
-            cylinders: 1,
-            heads: 1,
-            sectors: len/512,
-            sector_size: 512,
-        }))),
-        (magic, len) => return Err(anyhow!("Unknown image type (magic number: {:x?}, length: {})", magic, len)),
-    }
-}
+    let dev = open_device(&args.flag_image)?;
 
-fn with_block_dev<B: BlockDevice>(args: &Args, dev: B) -> anyhow::Result<()> {
     // Do this early so we can dump corrupt images (since RT11FS::new() might die).
     if args.cmd_dump {
         return dump(&dev, args.flag_sector);
