@@ -31,6 +31,7 @@ pub trait FileSystem {
     fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry>;
     fn free_blocks(&self) -> usize;
     fn used_blocks(&self) -> usize;
+    fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer>;
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>>;
     fn delete(&mut self, name: &str) -> anyhow::Result<()>;
     fn coalesce_empty(&mut self, segment: usize, entry: usize);
@@ -152,6 +153,13 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
 
     fn used_blocks(&self) -> usize {
         self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+    }
+
+    fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> {
+        let Some(file) = self.file_named(&name) else {
+            return Err(anyhow!("File not found: {}", name));
+        };
+        self.image.read_blocks(file.block, file.length)
     }
 
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
@@ -708,6 +716,7 @@ impl<B: BlockDevice> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
     fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> { self.deref().file_named(name) }
     fn free_blocks(&self) -> usize { self.deref().free_blocks() }
     fn used_blocks(&self) -> usize { self.deref().used_blocks() }
+    fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> { self.deref().read_file(name) }
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>> { self.deref_mut().create(name, bytes) }
     fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
     fn coalesce_empty(&mut self, segment: usize, entry: usize) { self.deref_mut().coalesce_empty(segment, entry) }

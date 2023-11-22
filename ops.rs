@@ -76,11 +76,9 @@ pub fn cp_from_image(fs: &impl FileSystem, src: &Path, dest: &Path) -> anyhow::R
     };
     let source_file = src.to_str().ok_or(anyhow!("Bad filename: {}", src.to_string_lossy()))?
         .to_uppercase();
-    let Some(file) = fs.file_named(&source_file) else {
-        return Err(anyhow!("File not found: {}", source_file));
-    };
+    let data = fs.read_file(&source_file)?;
+    let file = fs.file_named(&source_file).unwrap();
     print!("{} -> {}", file.name, local_dest.to_string_lossy());
-    let data = fs.image.read_blocks(file.block, file.length)?;
     std::fs::write(local_dest, data.as_bytes())?;
     print!("... Successfully copied {} blocks ({} bytes)\n", file.length, file.length * BLOCK_SIZE);
     Ok(())
