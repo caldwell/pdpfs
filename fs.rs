@@ -35,6 +35,7 @@ pub trait FileSystem {
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>>;
     fn delete(&mut self, name: &str) -> anyhow::Result<()>;
     fn coalesce_empty(&mut self, segment: usize, entry: usize);
+    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()>;
 }
 
 impl<B: BlockDevice> RT11FS<B> {
@@ -218,6 +219,21 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         self.dir[segment].entries.drain(entry+1..=entry+1);
     }
 
+    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> {
+        DirEntry::encode_filename(dest)?;
+        if src == dest { return Ok(()) } // Gotta check for this otherwise we'd delete ourselves below!
+        // Can't combine this with find_file_named() below because the (segment,entry)
+        // might change after we delete the dest (due to coalesce_empty()). And we don't
+        // want to delete the dest _before_ error checking.
+        if !self.file_named(src).is_some() { return Err(anyhow!("File not found")) };
+        if self.file_named(dest).is_some() {
+            self.delete(dest)?;
+        }
+        let (segment, entry) = self.find_file_named(src).unwrap(/*we already checked*/);
+        self.dir[segment].entries[entry].name = dest.to_owned();
+        self.write_directory_segment(segment)?;
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -723,6 +739,7 @@ impl<B: BlockDevice> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>> { self.deref_mut().create(name, bytes) }
     fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
     fn coalesce_empty(&mut self, segment: usize, entry: usize) { self.deref_mut().coalesce_empty(segment, entry) }
+    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> { self.deref_mut().rename(src, dest) }
 }
 
 #[cfg(test)]

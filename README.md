@@ -16,6 +16,7 @@ Find the latest version at https://porkrind.org/rt11fs
     rt11fs -h
     rt11fs [-h] -i <image> ls [-l] [-a]
     rt11fs [-h] -i <image> cp <source-file> <dest-file>
+    rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
     rt11fs [-h] -i <image> rm <file>
     rt11fs [-h] -i <image> init <device-type>
     rt11fs [-h] -i <image> dump [--sector]
@@ -58,6 +59,16 @@ Examples:
 
     # This copies 'FILE.TXT' from the image into './file.txt' on the local machine:
     rt11fs -i my_image.img cp file.txt ./
+
+#### `mv [-f] <source-file> <dest-file>`
+
+    -f --force            Overwrite destination file if it exists.
+
+Move (rename) files on the image. `<source-file>` and `<dest-file>` specify
+files on the image.
+
+If `<dest-file>` already exists on the image an error will be indicated,
+unless the `--force` option is used.
 
 #### `rm <file>`
 
@@ -129,6 +140,10 @@ interpreted as the local computer).:
 Copy a file to the image from the local computer:
 
     rt11fs -i RT11RX01.IMD cp STARTS.COM ./
+
+Rename a file on the image:
+
+    rt11fs -i RT11RX01.IMD mv STARTS.COM starts.bak
 
 Initialize a new blank image (it uses the image extension to figure out the
 image format):

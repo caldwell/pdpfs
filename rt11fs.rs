@@ -19,6 +19,7 @@ Usage:
   rt11fs -h
   rt11fs [-h] -i <image> ls [-l] [-a]
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
+  rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
   rt11fs [-h] -i <image> rm <file>
   rt11fs [-h] -i <image> init <device-type>
   rt11fs [-h] -i <image> dump [--sector]
@@ -56,6 +57,15 @@ Options:
      # This copies 'FILE.TXT' from the image into './file.txt' on the local machine:
      rt11fs -i my_image.img cp file.txt ./
 
+ mv:
+   -f --force            Overwrite destination file if it exists.
+
+   Move (rename) files on the image. <source-file> and <dest-file> specify files
+   on the image.
+
+   If <dest-file> already exists on the image an error will be indicated, unless
+   the --force option is used.
+
  rm:
    <file> will be deleted from the image.
 
@@ -82,8 +92,10 @@ struct Args {
     flag_sector:      bool,
     flag_long:        bool,
     flag_all:         bool,
+    flag_force:       bool,
     cmd_ls:           bool,
     cmd_cp:           bool,
+    cmd_mv:           bool,
     cmd_rm:           bool,
     cmd_dump:         bool,
     cmd_dump_home:    bool,
@@ -145,6 +157,11 @@ fn main() -> anyhow::Result<()> {
 
     if args.cmd_rm {
         rm(&mut fs, &args.arg_file)?;
+        save_image(fs.image.physical_device(), &args.flag_image)?;
+    }
+
+    if args.cmd_mv {
+        mv(&mut fs, &args.arg_source_file, &args.arg_dest_file, args.flag_force)?;
         save_image(fs.image.physical_device(), &args.flag_image)?;
     }
 

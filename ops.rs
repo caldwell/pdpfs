@@ -168,6 +168,11 @@ pub fn rm(fs: &mut impl FileSystem, file: &Path) -> anyhow::Result<()> {
     fs.delete(&path_to_rt11_filename(file)?)
 }
 
+pub fn mv(fs: &mut impl FileSystem, src: &Path, dest: &Path, overwrite_dest: bool) -> anyhow::Result<()> {
+    if !overwrite_dest && fs.file_named(&path_to_rt11_filename(dest)?).is_some() { return Err(anyhow!("Destination file already exists")) }
+    fs.rename(&path_to_rt11_filename(src)?, &path_to_rt11_filename(dest)?)
+}
+
 pub fn init(image: &Path, dtype: DeviceType) -> anyhow::Result<()> {
     let ext = image.extension().and_then(|oss| oss.to_str());
     match (dtype, ext) {
