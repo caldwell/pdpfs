@@ -38,8 +38,8 @@ impl<B: PhysicalBlockDevice> BlockDevice for RX<B> {
         (g.cylinders - 1) * g.heads * g.sectors // don't include track 0 in the sector count (see above)
     }
 
-    fn physical_device(&self) -> &impl PhysicalBlockDevice {
-        &self.0
+    fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice> {
+        Box::new(&self.0)
     }
 }
 

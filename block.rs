@@ -37,7 +37,29 @@ pub trait BlockDevice {
     fn write_sector(&mut self, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn sector_size(&self) -> usize;
     fn sectors(&self) -> usize;
-    fn physical_device(&self) -> &impl PhysicalBlockDevice;
+    fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice>;
+}
+
+impl BlockDevice for Box<dyn BlockDevice> {
+    fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
+        self.as_ref().read_sector(sector)
+    }
+
+    fn write_sector<'b>(&mut self, sector: usize, buf: &'b [u8]) -> anyhow::Result<()> {
+        self.as_mut().write_sector(sector, buf)
+    }
+
+    fn sector_size(&self) -> usize {
+        self.as_ref().sector_size()
+    }
+
+    fn sectors(&self) -> usize {
+        self.as_ref().sectors()
+    }
+
+    fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice> {
+        self.as_ref().physical_device()
+    }
 }
 
 pub trait PhysicalBlockDevice {
@@ -50,7 +72,7 @@ pub trait PhysicalBlockDevice {
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()>;
     fn as_vec(&self) -> anyhow::Result<Vec<u8>>;
 
-    fn from_raw(data: Vec<u8>, geometry: Geometry) -> Self;
+    fn from_raw(data: Vec<u8>, geometry: Geometry) -> Self where Self: Sized;
 
     fn to_raw(&self) -> anyhow::Result<(Geometry, Vec<u8>)> {
         let g = self.geometry();

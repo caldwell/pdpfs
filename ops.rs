@@ -29,7 +29,7 @@ pub enum ImageType {
     IMG,
 }
 
-pub fn ls<B: BlockDevice>(fs: &RT11FS<B>, long: bool, all: bool) {
+pub fn ls(fs: &impl FileSystem, long: bool, all: bool) {
     for f in if all { Box::new(fs.dir_iter()) as Box<dyn Iterator<Item = &DirEntry>> }
              else   { Box::new(fs.file_iter()) as Box<dyn Iterator<Item = &DirEntry>> } {
         match long {
@@ -45,7 +45,7 @@ pub fn ls<B: BlockDevice>(fs: &RT11FS<B>, long: bool, all: bool) {
              used_blocks + free_blocks, (used_blocks + free_blocks) * BLOCK_SIZE);
 }
 
-pub fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
+pub fn cp_from_image(fs: &impl FileSystem, src: &Path, dest: &Path) -> anyhow::Result<()> {
     let local_dest = match (dest.exists(), std::fs::metadata(&dest)) {
         (true, Ok(m)) if m.is_dir() => dest.join(src.file_name().ok_or(anyhow!("Bad filename: {}", src.to_string_lossy()))?),
         (true, Err(e)) => Err(e).with_context(|| format!("{}", dest.to_string_lossy()))?,
@@ -63,7 +63,7 @@ pub fn cp_from_image<B: BlockDevice>(fs: &RT11FS<B>, src: &Path, dest: &Path) ->
     Ok(())
 }
 
-pub fn cp_into_image<B: BlockDevice>(fs: &mut RT11FS<B>, src: &Path, dest: &Path) -> anyhow::Result<()> {
+pub fn cp_into_image(fs: &mut impl FileSystem, src: &Path, dest: &Path) -> anyhow::Result<()> {
     let m = src.metadata()?;
     let dest = match dest {
         d if d == Path::new(".") => Path::new(src.file_name().ok_or_else(|| anyhow!("Need source filename to use '.'"))?),
@@ -76,7 +76,7 @@ pub fn cp_into_image<B: BlockDevice>(fs: &mut RT11FS<B>, src: &Path, dest: &Path
     Ok(())
 }
 
-pub fn save_image<P: PhysicalBlockDevice>(dev: &P, filename: &Path) -> anyhow::Result<()> {
+pub fn save_image(dev: Box<&dyn PhysicalBlockDevice>, filename: &Path) -> anyhow::Result<()> {
     let new_image = dev.as_vec()?;
     let newname = filename.append(".new");
     let bakname = filename.append(".bak");
@@ -88,7 +88,7 @@ pub fn save_image<P: PhysicalBlockDevice>(dev: &P, filename: &Path) -> anyhow::R
     Ok(())
 }
 
-pub fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
+pub fn dump(image: &Box<dyn BlockDevice>, by_sector: bool) -> anyhow::Result<()> {
     if by_sector {
         for s in 0..image.sectors() {
             println!("Sector {}\n{:?}", s, image.read_sector(s)?.hex_dump());
@@ -101,13 +101,13 @@ pub fn dump<B: BlockDevice>(image: &B, by_sector: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn dump_home<B: BlockDevice>(image: &B) -> anyhow::Result<()> {
+pub fn dump_home(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
     let home = RT11FS::read_homeblock(image)?;
     println!("{:#?}", home);
     Ok(())
 }
 
-pub fn dump_dir<B: BlockDevice>(image: &B) -> anyhow::Result<()> {
+pub fn dump_dir(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
     let segment_block = RT11FS::read_homeblock(image).map(|home| home.directory_start_block).unwrap_or(6);
 
     for (num, segment) in RT11FS::read_directory(image, segment_block).enumerate() {
@@ -143,7 +143,7 @@ pub fn dump_dir<B: BlockDevice>(image: &B) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn rm<B: BlockDevice>(fs: &mut RT11FS<B>, file: &Path) -> anyhow::Result<()> {
+pub fn rm(fs: &mut impl FileSystem, file: &Path) -> anyhow::Result<()> {
     fs.delete(&path_to_rt11_filename(file)?)
 }
 
@@ -163,11 +163,11 @@ pub fn init_fs<B: BlockDevice>(path: &Path, image: B) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn convert<B: BlockDevice>(image: &B, image_type: ImageType, dest: &Path) -> anyhow::Result<()> {
+pub fn convert(image: &Box<dyn BlockDevice>, image_type: ImageType, dest: &Path) -> anyhow::Result<()> {
     let (geometry, data) = image.physical_device().to_raw()?;
     match image_type {
-        ImageType::IMG => save_image(&IMG::from_raw(data, geometry), dest)?,
-        ImageType::IMD => save_image(&IMD::from_raw(data, geometry), dest)?,
+        ImageType::IMG => save_image(Box::new(&IMG::from_raw(data, geometry)), dest)?,
+        ImageType::IMD => save_image(Box::new(&IMD::from_raw(data, geometry)), dest)?,
     }
     Ok(())
 }

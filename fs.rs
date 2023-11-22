@@ -1,6 +1,6 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-use std::{cmp::min, io, io::ErrorKind, fmt::Debug};
+use std::{cmp::min, io, io::ErrorKind, fmt::Debug, ops::{Deref, DerefMut}};
 
 use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
@@ -23,6 +23,19 @@ pub struct RT11FS<B: BlockDevice> {
     pub dir: Vec<DirSegment>,
 }
 
+pub trait FileSystem {
+    type BlockDevice: BlockDevice;
+
+    fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, Self::BlockDevice>;
+    fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, Self::BlockDevice>, Box<dyn FnMut(&&'a DirEntry) -> bool>>;
+    fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry>;
+    fn free_blocks(&self) -> usize;
+    fn used_blocks(&self) -> usize;
+    fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>>;
+    fn delete(&mut self, name: &str) -> anyhow::Result<()>;
+    fn coalesce_empty(&mut self, segment: usize, entry: usize);
+}
+
 impl<B: BlockDevice> RT11FS<B> {
     pub fn new(image: B) -> anyhow::Result<RT11FS<B>> {
         let home = Self::read_homeblock(&image)?;
@@ -32,6 +45,15 @@ impl<B: BlockDevice> RT11FS<B> {
             home,
             dir,
         })
+    }
+
+    // Initialize a filesystem on this image
+    pub fn init(mut image: B) -> anyhow::Result<RT11FS<B>> {
+        let home = HomeBlock::new();
+        image.write_blocks(1, 1, &home.repr()?)?;
+        let dir_segment = DirSegment::new(home.directory_start_block, 4, image.blocks() as u16);
+        image.write_blocks(home.directory_start_block as usize, 2, &dir_segment.repr()?)?;
+        return Self::new(image);
     }
 
     pub fn read_homeblock(image: &B) -> anyhow::Result<HomeBlock> {
@@ -83,30 +105,6 @@ impl<B: BlockDevice> RT11FS<B> {
         }
     }
 
-    pub fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, B> {
-        DirEntryIterator {
-            fs: self,
-            segment: 0,
-            entry: 0,
-        }
-    }
-
-    pub fn file_iter<'a>(&'a self) -> impl Iterator<Item = &'a DirEntry> + 'a {
-        self.dir_iter().filter(|e| e.kind == EntryKind::Permanent)
-    }
-
-    pub fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
-        self.file_iter().find(|f| f.name == name)
-    }
-
-    pub fn free_blocks(&self) -> usize {
-        self.dir_iter().filter(|e| e.kind == EntryKind::Empty).fold(0, |acc, e| acc + e.length)
-    }
-
-    pub fn used_blocks(&self) -> usize {
-        self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
-    }
-
     fn find<F>(&self, predicate: F) -> Option<(usize, usize)>
     where F: Fn(&DirEntry) -> bool
     {
@@ -127,7 +125,36 @@ impl<B: BlockDevice> RT11FS<B> {
         self.find(|f| f.kind == EntryKind::Permanent && f.name == name)
     }
 
-    pub fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
+}
+
+impl<B: BlockDevice> FileSystem for RT11FS<B> {
+    type BlockDevice=B;
+
+    fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, B> {
+        DirEntryIterator {
+            fs: self,
+            segment: 0,
+            entry: 0,
+        }
+    }
+
+    fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, B>, Box<dyn FnMut(&&'a DirEntry) -> bool>> {
+        self.dir_iter().filter(Box::new(|e: &&'a DirEntry| e.kind == EntryKind::Permanent))
+    }
+
+    fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
+        self.file_iter().find(|f| f.name == name)
+    }
+
+    fn free_blocks(&self) -> usize {
+        self.dir_iter().filter(|e| e.kind == EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+    }
+
+    fn used_blocks(&self) -> usize {
+        self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+    }
+
+    fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
         let blocks = (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
         DirEntry::encode_filename(name)?;
         _ = self.delete(name); // Can only fail because file-not-found, which is a no-op here.
@@ -158,7 +185,7 @@ impl<B: BlockDevice> RT11FS<B> {
         })
     }
 
-    pub fn delete(&mut self, name: &str) -> anyhow::Result<()> {
+    fn delete(&mut self, name: &str) -> anyhow::Result<()> {
         let Some((segment, entry)) = self.find_file_named(name) else { return Err(anyhow!("File not found")) };
         self.dir[segment].entries[entry].kind = EntryKind::Empty;
         self.coalesce_empty(segment, entry);
@@ -169,7 +196,7 @@ impl<B: BlockDevice> RT11FS<B> {
         Ok(())
     }
 
-    pub fn coalesce_empty(&mut self, segment: usize, entry: usize) {
+    fn coalesce_empty(&mut self, segment: usize, entry: usize) {
         if entry+1 >= self.dir[segment].entries.len() ||
            self.dir[segment].entries[entry  ].kind != EntryKind::Empty ||
            self.dir[segment].entries[entry+1].kind != EntryKind::Empty {
@@ -180,14 +207,6 @@ impl<B: BlockDevice> RT11FS<B> {
         self.dir[segment].entries.drain(entry+1..=entry+1);
     }
 
-    // Initialize a filesystem on this image
-    pub fn init(mut image: B) -> anyhow::Result<RT11FS<B>> {
-        let home = HomeBlock::new();
-        image.write_blocks(1, 1, &home.repr()?)?;
-        let dir_segment = DirSegment::new(home.directory_start_block, 4, image.blocks() as u16);
-        image.write_blocks(home.directory_start_block as usize, 2, &dir_segment.repr()?)?;
-        return Self::new(image);
-    }
 }
 
 #[derive(Clone)]
@@ -680,6 +699,20 @@ impl<'a, B: BlockDevice> Drop for RT11FileWriter<'a, B> {
     }
 }
 
+
+// It's really a shame this isn't automatic or derivable or something.
+impl<B: BlockDevice> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
+    type BlockDevice = B;
+    fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, Self::BlockDevice> { self.deref().dir_iter() }
+    fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, Self::BlockDevice>, Box<dyn FnMut(&&'a DirEntry) -> bool>> { self.deref().file_iter() }
+    fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> { self.deref().file_named(name) }
+    fn free_blocks(&self) -> usize { self.deref().free_blocks() }
+    fn used_blocks(&self) -> usize { self.deref().used_blocks() }
+    fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>> { self.deref_mut().create(name, bytes) }
+    fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
+    fn coalesce_empty(&mut self, segment: usize, entry: usize) { self.deref_mut().coalesce_empty(segment, entry) }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -708,8 +741,8 @@ mod test {
         }
         fn sector_size(&self) -> usize { 512 }
         fn sectors(&self) -> usize { self.0.len()/512 }
-        fn physical_device(&self) -> &impl crate::block::PhysicalBlockDevice {
-            self
+        fn physical_device(&self) -> Box<&dyn crate::block::PhysicalBlockDevice> {
+            Box::new(self)
         }
     }
     impl PhysicalBlockDevice for TestDev {

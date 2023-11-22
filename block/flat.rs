@@ -25,8 +25,8 @@ impl<B: PhysicalBlockDevice> BlockDevice for Flat<B> {
         g.cylinders * g.heads * g.sectors
     }
 
-    fn physical_device(&self) -> &impl PhysicalBlockDevice {
-        &self.0
+    fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice> {
+        Box::new(&self.0)
     }
 }
 
