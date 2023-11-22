@@ -126,6 +126,9 @@ impl<B: BlockDevice> RT11FS<B> {
         self.find(|f| f.kind == EntryKind::Permanent && f.name == name)
     }
 
+    fn write_directory_segment(&mut self, segment: usize) -> anyhow::Result<()> {
+        self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)
+    }
 }
 
 impl<B: BlockDevice> FileSystem for RT11FS<B> {
@@ -184,7 +187,7 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         new_free.block += blocks;
         new_free.length -= blocks;
         self.dir[segment].entries.insert(entry+1, new_free);
-        self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)?;
+        self.write_directory_segment(segment)?;
         Ok(RT11FileWriter{
             image: &mut self.image,
             direntry: &self.dir[segment].entries[entry],
@@ -200,7 +203,7 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         if entry > 0 {
             self.coalesce_empty(segment, entry-1);
         }
-        self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)?;
+        self.write_directory_segment(segment)?;
         Ok(())
     }
 
