@@ -1,7 +1,5 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-#![feature(return_position_impl_trait_in_trait)]
-
 mod block;
 mod fs;
 mod ops;
