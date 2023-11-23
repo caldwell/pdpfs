@@ -36,6 +36,7 @@ pub trait FileSystem {
     fn delete(&mut self, name: &str) -> anyhow::Result<()>;
     fn coalesce_empty(&mut self, segment: usize, entry: usize);
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()>;
+    fn block_device(&self) -> &Self::BlockDevice;
 }
 
 impl<B: BlockDevice> RT11FS<B> {
@@ -233,6 +234,10 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         self.dir[segment].entries[entry].name = dest.to_owned();
         self.write_directory_segment(segment)?;
         Ok(())
+    }
+
+    fn block_device(&self) -> &B {
+        &self.image
     }
 }
 
@@ -740,6 +745,7 @@ impl<B: BlockDevice> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
     fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
     fn coalesce_empty(&mut self, segment: usize, entry: usize) { self.deref_mut().coalesce_empty(segment, entry) }
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> { self.deref_mut().rename(src, dest) }
+    fn block_device(&self) -> &B { self.deref().block_device() }
 }
 
 #[cfg(test)]
