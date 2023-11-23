@@ -39,9 +39,8 @@ function open_image(image_path) {
     create_fs_window(`RT-11: ${image_path}`, id);
 }
 
-ipcMain.handle('pdpfs:get_directory_entries', async (event, id) => pdpfs.get_directory_entries(id));
-
-ipcMain.handle('pdpfs:cp_into_image', async (event, id, path) => pdpfs.cp_into_image(id, path));
+ipcMain.handle('pdpfs:get_directory_entries', async (event, ...args) => pdpfs.get_directory_entries(...args));
+ipcMain.handle('pdpfs:cp_into_image',         async (event, ...args) => pdpfs.cp_into_image        (...args));
 
 ipcMain.on('ondragstart', (event, image_id, filenames) => {
     console.log(`dragging [${image_id}] ${temp_path[image_id]}/{${filenames.join(',')}}...`);
