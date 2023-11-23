@@ -10,6 +10,10 @@ path="lib.rs"
 name="pdpfs"
 path="pdpfs.rs"
 
+[workspace]
+members = ["viewer"]
+resolver = "2"
+
 [dependencies]
 radix50 = "0.1"
 bytebuffer = "2"

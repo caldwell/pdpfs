@@ -1,0 +1,29 @@
+{
+  "name": "viewer",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.node",
+  "scripts": {
+    "build": "npm run build-rs && npm run build-web",
+    "build-rs": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics",
+    "build-web": "esbuild web/pdpfs.js --sourcemap --metafile=bundle-meta.json --outfile=web/pdpfs.bundle.js --external:'/assets/*' --bundle",
+    "build-debug": "npm run build --",
+    "build-release": "npm run build -- --release",
+    "install": "npm run build-release",
+    "test": "cargo test"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "cargo-cp-artifact": "^0.1",
+    "electron": "^27.1.0",
+    "@caldwell/jsml": "^1.1.5",
+    "bootstrap": "^5.3.0-alpha1",
+    "esbuild": "0.17.8",
+    "react": "^18.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "^18.2.0",
+    "sass": "^1.58.1"
+  }
+}

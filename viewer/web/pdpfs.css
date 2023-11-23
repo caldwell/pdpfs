@@ -1,0 +1,163 @@
+/* @import "something.css"; */
+
+:root {
+    color-scheme: light dark;
+    /* --margin-x: 3rem; */
+    /* --margin-y: 2rem; */
+    --light-background: rgb(255,255,255);
+    --light-zebra: rgb(244, 245, 245);
+    --light-selection: #803482; /* FIXME */
+    --light-selection-disabled: #464646; /* FIXME */
+    --light-separator: rgb(221,221,221);
+    --light-header-sort-column: #272727;
+    --light-filename: #272727;
+    --light-boring: #808080;
+    --light-sidebar-background: #e2e2e2;
+    --light-sidebar-background-disabled: #e9e9e9;
+    --light-topbar-background: #f6f5f5;
+    --light-topbar-background-disabled: #e9e9e9;
+    --light-topbar-highlight-background: #e9e8e8;
+    --light-topbar-highlight-background-disabled: #dcdbdc;
+    --light-topbar-filename:#4a4a4a;
+    --light-topbar-filename-disabled: #a9a8a9;
+    --light-topbar-boring: #6f6f6f;
+    --light-topbar-boring-disabled: #6f6f6f;
+    --light-drop-outline: #705771; /* FIXME */
+
+    --dark-background: #232222;
+    --dark-zebra: #2d2c2c;
+    --dark-selection: #803482;
+    --dark-selection-disabled: #464646;
+    --dark-separator: #454444;
+    --dark-header-sort-column: #dddddd;
+    --dark-filename: #dfdfdf;
+    --dark-boring: #acacac;
+    --dark-sidebar-background: #3b3b3b;
+    --dark-sidebar-background-disabled: #2c2b2b;
+    --dark-topbar-background: #383838;
+    --dark-topbar-background-disabled: #2c2b2b;
+    --dark-topbar-highlight-background: #444444;
+    --dark-topbar-highlight-background-disabled: #393838;
+    --dark-topbar-filename:#ebebeb;
+    --dark-topbar-filename-disabled: #6d6c6c;
+    --dark-topbar-boring: #9c9c9c;
+    --dark-topbar-boring-disabled: #616060;
+    --dark-drop-outline: #705771;
+}
+
+:root {
+    --zebra:                                var(--light-zebra);
+    --background:                           var(--light-background);
+    --selection:                            var(--light-selection);
+    --selection-disabled:                   var(--light-selection-disabled);
+    --separator:                            var(--light-separator);
+    --header-sort-column:                   var(--light-header-sort-column);
+    --filename:                             var(--light-filename);
+    --boring:                               var(--light-boring);
+    --sidebar-background:                   var(--light-sidebar-background);
+    --sidebar-background-disabled:          var(--light-sidebar-background-disabled);
+    --topbar-background:                    var(--light-topbar-background);
+    --topbar-background-disabled:           var(--light-topbar-background-disabled);
+    --topbar-highlight-background:          var(--light-topbar-highlight-background);
+    --topbar-highlight-background-disabled: var(--light-topbar-highlight-background-disabled);
+    --topbar-filename:                      var(--light-topbar-filename);
+    --topbar-filename-disabled:             var(--light-topbar-filename-disabled);
+    --topbar-boring:                        var(--light-topbar-boring);
+    --topbar-boring-disabled:               var(--light-topbar-boring-disabled);
+    --drop-outline:                         var(--light-drop-outline);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --zebra:                                var(--dark-zebra);
+        --background:                           var(--dark-background);
+        --selection:                            var(--dark-selection);
+        --selection-disabled:                   var(--dark-selection-disabled);
+        --separator:                            var(--dark-separator);
+        --header-sort-column:                   var(--dark-header-sort-column);
+        --filename:                             var(--dark-filename);
+        --boring:                               var(--dark-boring);
+        --sidebar-background:                   var(--dark-sidebar-background);
+        --sidebar-background-disabled:          var(--dark-sidebar-background-disabled);
+        --topbar-background:                    var(--dark-topbar-background);
+        --topbar-background-disabled:           var(--dark-topbar-background-disabled);
+        --topbar-highlight-background:          var(--dark-topbar-highlight-background);
+        --topbar-highlight-background-disabled: var(--dark-topbar-highlight-background-disabled);
+        --topbar-filename:                      var(--dark-topbar-filename);
+        --topbar-filename-disabled:             var(--dark-topbar-filename-disabled);
+        --topbar-boring:                        var(--dark-topbar-boring);
+        --topbar-boring-disabled:               var(--dark-topbar-boring-disabled);
+        --drop-outline:                         var(--dark-drop-outline);
+    }
+}
+
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    font-variant: tabular-nums;
+    font-size: 14px;
+    background-color: var(--background);
+    color: var(--filename);
+}
+
+#pdpfs {
+    min-width: 30rem;
+}
+.directory-list {
+    display: grid;
+    grid-template-areas: "f b s d";
+    border: 2px solid var(--background);
+}
+.directory-list.hover {
+    border-color: var(--drop-outline);
+}
+
+.header, .direntry {
+    grid-row: auto;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column-end: span 4;
+}
+.directory-list .filename {
+    grid-area: f;
+    color: var(--filename);
+    padding-left: 1em;
+}
+
+.blocks {
+    grid-area: b;
+    color: var(--boring);
+}
+.size {
+    grid-area: s;
+    color: var(--boring);
+}
+.date {
+    grid-area: d;
+    color: var(--boring);
+}
+.header {
+    border-bottom: 1px solid var(--separator);
+}
+.directory-list div {
+    padding: .1rem;
+}
+.directory-list .direntry {
+    border-radius: 7px;
+}
+.directory-list .direntry:nth-child(2n+1) {
+    background-color: var(--zebra);
+}
+.directory-list .direntry.selected {
+    background-color: var(--selection);
+}
+
+/* Make consecutive selections meld together nicely */
+.direntry.selected + .direntry.selected {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+.direntry.selected:has(+ .direntry.selected) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
