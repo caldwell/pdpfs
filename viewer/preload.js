@@ -7,4 +7,8 @@ contextBridge.exposeInMainWorld('pdpfs', {
     cp_into_image:         (id, path)       => ipcRenderer.invoke('pdpfs:cp_into_image', id, path),
     open_file:             ()               => ipcRenderer.invoke('dialog:openFile'),
     start_drag:            (id, file_names) => ipcRenderer.send('ondragstart', id, file_names),
+    image_is_dirty:        (id)             => ipcRenderer.invoke('pdpfs:image_is_dirty', id),
+    mv:                    (id, src, dest)  => ipcRenderer.invoke('pdpfs:mv', id, src, dest),
+    rm:                    (id, filename)   => ipcRenderer.invoke('pdpfs:rm', id, filename),
+    save:                  (id)             => ipcRenderer.invoke('pdpfs:save', id),
 })

@@ -41,6 +41,10 @@ function open_image(image_path) {
 
 ipcMain.handle('pdpfs:get_directory_entries', async (event, ...args) => pdpfs.get_directory_entries(...args));
 ipcMain.handle('pdpfs:cp_into_image',         async (event, ...args) => pdpfs.cp_into_image        (...args));
+ipcMain.handle('pdpfs:image_is_dirty',        async (event, ...args) => pdpfs.image_is_dirty       (...args));
+ipcMain.handle('pdpfs:mv',                    async (event, ...args) => pdpfs.mv                   (...args));
+ipcMain.handle('pdpfs:rm',                    async (event, ...args) => pdpfs.rm                   (...args));
+ipcMain.handle('pdpfs:save',                  async (event, ...args) => pdpfs.save                 (...args));
 
 ipcMain.on('ondragstart', (event, image_id, filenames) => {
     console.log(`dragging [${image_id}] ${temp_path[image_id]}/{${filenames.join(',')}}...`);
