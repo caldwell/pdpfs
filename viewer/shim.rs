@@ -18,6 +18,7 @@ use pdpfs::block::BlockDevice;
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("open_image", open_image)?;
+    cx.export_function("image_is_dirty", image_is_dirty)?;
     cx.export_function("get_directory_entries", get_directory_entries)?;
     cx.export_function("extract_to_path", extract_to_path)?;
     cx.export_function("cp_into_image", cp_into_image)?;
@@ -30,6 +31,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
 struct Image {
     fs: Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>>,
+    dirty: bool,
 }
 
 lazy_static! {
@@ -57,9 +59,17 @@ fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
 
     let fs = Box::new(RT11FS::new(pdpfs::ops::open_device(&Path::new(&image_file)).expect("phys image bad")).expect("fs bad"));
 
-    IMAGES.lock().unwrap().insert(id, Image { fs });
+    IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
 
     Ok(cx.number(id))
+}
+
+fn image_is_dirty(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    js_args!(&mut cx, id: u32);
+    let dirty = with_image_id(id, |image| -> Result<bool, Error> {
+        Ok(image.dirty)
+    }).into_jserr(&mut cx)?;
+    Ok(cx.boolean(dirty))
 }
 
 fn get_directory_entries(mut cx: FunctionContext) -> JsResult<JsArray> {
@@ -103,6 +113,7 @@ fn cp_into_image(mut cx: FunctionContext) -> JsResult<JsNull> {
     with_image_id(id, |image| {
         pdpfs::ops::cp_into_image(&mut image.fs, &path, Path::new("."))
             .map_err(|e| format!("Could't write {}: {}", path.display(), e))
+            .and_then(|_| { image.dirty = true; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }
@@ -112,6 +123,7 @@ fn mv(mut cx: FunctionContext) -> JsResult<JsNull> {
     with_image_id(id, |image| {
         pdpfs::ops::mv(&mut image.fs, &src, &dest, overwrite_dest)
             .map_err(|e| format!("mv from {} to {} failed: {}", src.display(), dest.display(), e))
+            .and_then(|_| { image.dirty = true; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }
@@ -121,6 +133,7 @@ fn rm(mut cx: FunctionContext) -> JsResult<JsNull> {
     with_image_id(id, |image| {
         pdpfs::ops::rm(&mut image.fs, &file)
             .map_err(|e| format!("rm failed for {}: {}", file.display(), e))
+            .and_then(|_| { image.dirty = true; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }
@@ -130,6 +143,7 @@ fn save(mut cx: FunctionContext) -> JsResult<JsNull> {
     with_image_id(id, |image| {
         pdpfs::ops::save_image(image.fs.block_device().physical_device(), &file)
             .map_err(|e| format!("Couldn't save {}: {}", file.display(), e))
+            .and_then(|_| { image.dirty = false; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }
@@ -139,7 +153,7 @@ fn convert(mut cx: FunctionContext) -> JsResult<JsNull> {
     with_image_id(id, |image| {
         pdpfs::ops::convert(image.fs.block_device(), image_type, &file)
             .map_err(|e| format!("Couldn't save {}: {}", file.display(), e))
+            .and_then(|_| { image.dirty = true; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }
-
