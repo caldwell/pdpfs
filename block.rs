@@ -41,25 +41,11 @@ pub trait BlockDevice {
 }
 
 impl BlockDevice for Box<dyn BlockDevice> {
-    fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
-        self.as_ref().read_sector(sector)
-    }
-
-    fn write_sector<'b>(&mut self, sector: usize, buf: &'b [u8]) -> anyhow::Result<()> {
-        self.as_mut().write_sector(sector, buf)
-    }
-
-    fn sector_size(&self) -> usize {
-        self.as_ref().sector_size()
-    }
-
-    fn sectors(&self) -> usize {
-        self.as_ref().sectors()
-    }
-
-    fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice> {
-        self.as_ref().physical_device()
-    }
+    fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>>                    { self.as_ref().read_sector(sector) }
+    fn write_sector<'b>(&mut self, sector: usize, buf: &'b [u8]) -> anyhow::Result<()> { self.as_mut().write_sector(sector, buf) }
+    fn sector_size(&self) -> usize                                                     { self.as_ref().sector_size() }
+    fn sectors(&self) -> usize                                                         { self.as_ref().sectors() }
+    fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice>                         { self.as_ref().physical_device() }
 }
 
 pub trait PhysicalBlockDevice {
