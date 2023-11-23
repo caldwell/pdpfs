@@ -12,7 +12,7 @@ use bytebuffer::ByteBuffer;
 
 pub const BLOCK_SIZE: usize = 512; // This seems baked into the format, and unrelated to sector size, interestingly (which is 128 bytes on an RX-01).
 
-pub trait BlockDevice {
+pub trait BlockDevice : Send + Sync {
     fn read_blocks(&self, block: usize, count: usize) -> anyhow::Result<ByteBuffer> {
         let ssz = self.sector_size();
         let mut buf = vec![];
@@ -48,7 +48,7 @@ impl BlockDevice for Box<dyn BlockDevice> {
     fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice>                         { self.as_ref().physical_device() }
 }
 
-pub trait PhysicalBlockDevice {
+pub trait PhysicalBlockDevice : Send + Sync {
     fn geometry(&self) -> &Geometry;
     fn total_bytes(&self) -> usize {
         let g = self.geometry();

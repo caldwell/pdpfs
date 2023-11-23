@@ -12,7 +12,7 @@ radix50 = "0.1"
 bytebuffer = "2"
 anyhow = "1.0"
 pretty-hex = "0.3"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 docopt = "1"
 serde = "1"
 whoami = "1"

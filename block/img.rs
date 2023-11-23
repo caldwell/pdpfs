@@ -4,6 +4,7 @@ use super::{Geometry, PhysicalBlockDevice};
 
 use anyhow::anyhow;
 
+#[derive(Clone)]
 pub struct IMG {
     pub data: Vec<u8>,
     pub geometry: Geometry,

@@ -6,6 +6,7 @@ use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
 use chrono::NaiveDate;
 use pretty_hex::PrettyHex;
+use serde::Serialize;
 
 use crate::block::{BlockDevice, BLOCK_SIZE};
 
@@ -23,7 +24,7 @@ pub struct RT11FS<B: BlockDevice> {
     pub dir: Vec<DirSegment>,
 }
 
-pub trait FileSystem {
+pub trait FileSystem : Send + Sync {
     type BlockDevice: BlockDevice;
 
     fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, Self::BlockDevice>;
@@ -493,7 +494,7 @@ impl<'a, B: BlockDevice> Iterator for DirSegmentIterator<'a, B> {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize)]
 pub struct DirEntry {
     pub kind: EntryKind,
     pub read_only: bool,
@@ -510,7 +511,7 @@ pub struct DirEntry {
     pub block: usize,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum EntryKind {
     Tentative,
     Empty,
@@ -733,7 +734,7 @@ impl<'a, B: BlockDevice> Drop for RT11FileWriter<'a, B> {
 
 
 // It's really a shame this isn't automatic or derivable or something.
-impl<B: BlockDevice> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
+impl<B: BlockDevice+Send+Sync> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
     type BlockDevice = B;
     fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, Self::BlockDevice> { self.deref().dir_iter() }
     fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, Self::BlockDevice>, Box<dyn FnMut(&&'a DirEntry) -> bool>> { self.deref().file_iter() }
