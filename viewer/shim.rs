@@ -28,24 +28,26 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     Ok(())
 }
 
-type FS = Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>>;
+struct Image {
+    fs: Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>>,
+}
 
 lazy_static! {
-    static ref IMAGES: Mutex<HashMap<u32, FS>> = Mutex::new(HashMap::new());
+    static ref IMAGES: Mutex<HashMap<u32, Image>> = Mutex::new(HashMap::new());
     static ref NEXT_ID: AtomicU32 = AtomicU32::new(0);
 }
 
-fn with_fs_id<T,E,F>(id: u32, func: F) -> Result<T,Error>
-    where F: FnOnce(&mut FS) -> Result<T,E>,
+fn with_image_id<T,E,F>(id: u32, func: F) -> Result<T,Error>
+    where F: FnOnce(&mut Image) -> Result<T,E>,
           Error: From<E>,
           E: Into<Error>,
 {
     let mut images = IMAGES.lock().unwrap();
-    let Some(fs) = images.get_mut(&id) else {
+    let Some(image) = images.get_mut(&id) else {
         let e: Box<dyn std::error::Error> = format!("Bad ID").into();
         return Err(Error::Std(e));
     };
-    func(fs).map_err(|e| Error::from(e))
+    func(image).map_err(|e| Error::from(e))
 }
 
 fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
@@ -55,15 +57,15 @@ fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
 
     let fs = Box::new(RT11FS::new(pdpfs::ops::open_device(&Path::new(&image_file)).expect("phys image bad")).expect("fs bad"));
 
-    IMAGES.lock().unwrap().insert(id, fs);
+    IMAGES.lock().unwrap().insert(id, Image { fs });
 
     Ok(cx.number(id))
 }
 
 fn get_directory_entries(mut cx: FunctionContext) -> JsResult<JsArray> {
     js_args!(&mut cx, id: u32);
-    let entries = with_fs_id(id, |fs| {
-        fs.read_dir("/")
+    let entries = with_image_id(id, |image| {
+        image.fs.read_dir("/")
           .map_err(|err| cx.throw_error::<_,()>(format!("{}", err)).unwrap_err())?
           .map(|e| -> JsResult<JsValue> {
             let obj = cx.empty_object();
@@ -83,12 +85,12 @@ fn get_directory_entries(mut cx: FunctionContext) -> JsResult<JsArray> {
 
 fn extract_to_path(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, path: PathBuf);
-    with_fs_id(id, |fs| -> Result<(),String> {
+    with_image_id(id, |image| -> Result<(),String> {
         std::fs::create_dir_all(&path).map_err(|e| format!("Could't create directory: {}", e))?;
-        for entry in fs.read_dir("/")
+        for entry in image.fs.read_dir("/")
             .map_err(|e| format!("Could't read directory: {}", e))?
         {
-            std::fs::write(path.join(&entry.file_name()), fs.read_file(&entry.file_name()).unwrap().as_bytes())
+            std::fs::write(path.join(&entry.file_name()), image.fs.read_file(&entry.file_name()).unwrap().as_bytes())
                 .map_err(|e| format!("Could't write {}: {}", path.join(&entry.file_name()).display(), e))?;
         }
         Ok(())
@@ -98,8 +100,8 @@ fn extract_to_path(mut cx: FunctionContext) -> JsResult<JsNull> {
 
 fn cp_into_image(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, path: PathBuf);
-    with_fs_id(id, |fs| {
-        pdpfs::ops::cp_into_image(fs, &path, Path::new("."))
+    with_image_id(id, |image| {
+        pdpfs::ops::cp_into_image(&mut image.fs, &path, Path::new("."))
             .map_err(|e| format!("Could't write {}: {}", path.display(), e))
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
@@ -107,8 +109,8 @@ fn cp_into_image(mut cx: FunctionContext) -> JsResult<JsNull> {
 
 fn mv(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, src: PathBuf, dest: PathBuf, overwrite_dest: bool);
-    with_fs_id(id, |fs| {
-        pdpfs::ops::mv(fs, &src, &dest, overwrite_dest)
+    with_image_id(id, |image| {
+        pdpfs::ops::mv(&mut image.fs, &src, &dest, overwrite_dest)
             .map_err(|e| format!("mv from {} to {} failed: {}", src.display(), dest.display(), e))
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
@@ -116,8 +118,8 @@ fn mv(mut cx: FunctionContext) -> JsResult<JsNull> {
 
 fn rm(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, file: PathBuf);
-    with_fs_id(id, |fs| {
-        pdpfs::ops::rm(fs, &file)
+    with_image_id(id, |image| {
+        pdpfs::ops::rm(&mut image.fs, &file)
             .map_err(|e| format!("rm failed for {}: {}", file.display(), e))
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
@@ -125,8 +127,8 @@ fn rm(mut cx: FunctionContext) -> JsResult<JsNull> {
 
 fn save(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, file: PathBuf);
-    with_fs_id(id, |fs| {
-        pdpfs::ops::save_image(fs.block_device().physical_device(), &file)
+    with_image_id(id, |image| {
+        pdpfs::ops::save_image(image.fs.block_device().physical_device(), &file)
             .map_err(|e| format!("Couldn't save {}: {}", file.display(), e))
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
@@ -134,8 +136,8 @@ fn save(mut cx: FunctionContext) -> JsResult<JsNull> {
 
 fn convert(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, file: PathBuf, image_type: pdpfs::ops::ImageType);
-    with_fs_id(id, |fs| {
-        pdpfs::ops::convert(fs.block_device(), image_type, &file)
+    with_image_id(id, |image| {
+        pdpfs::ops::convert(image.fs.block_device(), image_type, &file)
             .map_err(|e| format!("Couldn't save {}: {}", file.display(), e))
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
