@@ -7,7 +7,8 @@ use crate::block::flat::Flat;
 use crate::block::imd::IMD;
 use crate::block::img::IMG;
 use crate::block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
-use crate::fs::{DirEntry,DirSegment,RT11FS,FileSystem};
+use crate::fs::FileSystem;
+use crate::fs::rt11::{DirEntry,DirSegment,RT11FS};
 
 use std::fs::rename;
 use std::io::Write;

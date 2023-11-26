@@ -7,7 +7,7 @@ mod ops;
 use std::path::PathBuf;
 
 use block::BlockDevice;
-use fs::RT11FS;
+use fs::rt11::RT11FS;
 use ops::*;
 
 use anyhow::anyhow;
