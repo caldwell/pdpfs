@@ -29,7 +29,7 @@ pub trait FileSystem : Send + Sync {
 
     fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, Self::BlockDevice>;
     fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, Self::BlockDevice>, Box<dyn FnMut(&&'a DirEntry) -> bool>>;
-    fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry>;
+    fn stat<'a>(&'a self, name: &str) -> Option<&'a DirEntry>;
     fn free_blocks(&self) -> usize;
     fn used_blocks(&self) -> usize;
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer>;
@@ -149,7 +149,7 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         self.dir_iter().filter(Box::new(|e: &&'a DirEntry| e.kind == EntryKind::Permanent))
     }
 
-    fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
+    fn stat<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
         self.file_iter().find(|f| f.name == name)
     }
 
@@ -162,7 +162,7 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
     }
 
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> {
-        let Some(file) = self.file_named(&name) else {
+        let Some(file) = self.stat(&name) else {
             return Err(anyhow!("File not found: {}", name));
         };
         self.image.read_blocks(file.block, file.length)
@@ -227,8 +227,8 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         // Can't combine this with find_file_named() below because the (segment,entry)
         // might change after we delete the dest (due to coalesce_empty()). And we don't
         // want to delete the dest _before_ error checking.
-        if !self.file_named(src).is_some() { return Err(anyhow!("File not found")) };
-        if self.file_named(dest).is_some() {
+        if !self.stat(src).is_some() { return Err(anyhow!("File not found")) };
+        if self.stat(dest).is_some() {
             self.delete(dest)?;
         }
         let (segment, entry) = self.find_file_named(src).unwrap(/*we already checked*/);
@@ -738,7 +738,7 @@ impl<B: BlockDevice+Send+Sync> FileSystem for Box<dyn FileSystem<BlockDevice = B
     type BlockDevice = B;
     fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, Self::BlockDevice> { self.deref().dir_iter() }
     fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, Self::BlockDevice>, Box<dyn FnMut(&&'a DirEntry) -> bool>> { self.deref().file_iter() }
-    fn file_named<'a>(&'a self, name: &str) -> Option<&'a DirEntry> { self.deref().file_named(name) }
+    fn stat<'a>(&'a self, name: &str) -> Option<&'a DirEntry> { self.deref().stat(name) }
     fn free_blocks(&self) -> usize { self.deref().free_blocks() }
     fn used_blocks(&self) -> usize { self.deref().used_blocks() }
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> { self.deref().read_file(name) }
@@ -905,7 +905,7 @@ mod test {
             f.write(&incrementing(256)).expect("write");
         }
         fs.delete("TEST.TXT").expect("delete test.txt");
-        assert_eq!(fs.file_named("TEST.TXT"), None);
+        assert_eq!(fs.stat("TEST.TXT"), None);
         assert_eq!(fs.used_blocks(), 0);
         assert_block_eq!(fs.image, 6,
             vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x02, ____, ____, ____, ____,

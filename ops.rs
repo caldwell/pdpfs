@@ -77,7 +77,7 @@ pub fn cp_from_image(fs: &impl FileSystem, src: &Path, dest: &Path) -> anyhow::R
     let source_file = src.to_str().ok_or(anyhow!("Bad filename: {}", src.to_string_lossy()))?
         .to_uppercase();
     let data = fs.read_file(&source_file)?;
-    let file = fs.file_named(&source_file).unwrap();
+    let file = fs.stat(&source_file).unwrap();
     print!("{} -> {}", file.name, local_dest.to_string_lossy());
     std::fs::write(local_dest, data.as_bytes())?;
     print!("... Successfully copied {} blocks ({} bytes)\n", file.length, file.length * BLOCK_SIZE);
@@ -169,7 +169,7 @@ pub fn rm(fs: &mut impl FileSystem, file: &Path) -> anyhow::Result<()> {
 }
 
 pub fn mv(fs: &mut impl FileSystem, src: &Path, dest: &Path, overwrite_dest: bool) -> anyhow::Result<()> {
-    if !overwrite_dest && fs.file_named(&path_to_rt11_filename(dest)?).is_some() { return Err(anyhow!("Destination file already exists")) }
+    if !overwrite_dest && fs.stat(&path_to_rt11_filename(dest)?).is_some() { return Err(anyhow!("Destination file already exists")) }
     fs.rename(&path_to_rt11_filename(src)?, &path_to_rt11_filename(dest)?)
 }
 
