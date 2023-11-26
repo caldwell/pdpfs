@@ -35,7 +35,6 @@ pub trait FileSystem : Send + Sync {
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer>;
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>>;
     fn delete(&mut self, name: &str) -> anyhow::Result<()>;
-    fn coalesce_empty(&mut self, segment: usize, entry: usize);
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()>;
     fn block_device(&self) -> &Self::BlockDevice;
 }
@@ -132,6 +131,17 @@ impl<B: BlockDevice> RT11FS<B> {
     fn write_directory_segment(&mut self, segment: usize) -> anyhow::Result<()> {
         self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)
     }
+
+    fn coalesce_empty(&mut self, segment: usize, entry: usize) {
+        if entry+1 >= self.dir[segment].entries.len() ||
+           self.dir[segment].entries[entry  ].kind != EntryKind::Empty ||
+           self.dir[segment].entries[entry+1].kind != EntryKind::Empty {
+            return;
+        }
+
+        self.dir[segment].entries[entry].length += self.dir[segment].entries[entry+1].length;
+        self.dir[segment].entries.drain(entry+1..=entry+1);
+    }
 }
 
 impl<B: BlockDevice> FileSystem for RT11FS<B> {
@@ -208,17 +218,6 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         }
         self.write_directory_segment(segment)?;
         Ok(())
-    }
-
-    fn coalesce_empty(&mut self, segment: usize, entry: usize) {
-        if entry+1 >= self.dir[segment].entries.len() ||
-           self.dir[segment].entries[entry  ].kind != EntryKind::Empty ||
-           self.dir[segment].entries[entry+1].kind != EntryKind::Empty {
-            return;
-        }
-
-        self.dir[segment].entries[entry].length += self.dir[segment].entries[entry+1].length;
-        self.dir[segment].entries.drain(entry+1..=entry+1);
     }
 
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> {
@@ -744,7 +743,6 @@ impl<B: BlockDevice+Send+Sync> FileSystem for Box<dyn FileSystem<BlockDevice = B
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> { self.deref().read_file(name) }
     fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, Self::BlockDevice>> { self.deref_mut().create(name, bytes) }
     fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
-    fn coalesce_empty(&mut self, segment: usize, entry: usize) { self.deref_mut().coalesce_empty(segment, entry) }
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> { self.deref_mut().rename(src, dest) }
     fn block_device(&self) -> &B { self.deref().block_device() }
 }
