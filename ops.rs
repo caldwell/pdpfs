@@ -7,8 +7,8 @@ use crate::block::flat::Flat;
 use crate::block::imd::IMD;
 use crate::block::img::IMG;
 use crate::block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
-use crate::fs::FileSystem;
-use crate::fs::rt11::{DirEntry,DirSegment,RT11FS};
+use crate::fs::{FileSystem,DirEntry};
+use crate::fs::rt11::{DirSegment,RT11FS};
 
 use std::fs::rename;
 use std::io::Write;
@@ -54,8 +54,8 @@ pub fn open_device(image_file: &Path) -> anyhow::Result<Box<dyn BlockDevice>> {
 }
 
 pub fn ls(fs: &impl FileSystem, long: bool, all: bool) {
-    for f in if all { Box::new(fs.dir_iter()) as Box<dyn Iterator<Item = &DirEntry>> }
-             else   { Box::new(fs.file_iter()) as Box<dyn Iterator<Item = &DirEntry>> } {
+    for f in if all { Box::new(fs.dir_iter("/").expect("fixme")) as Box<dyn Iterator<Item = Box<dyn DirEntry>>> }
+             else   { fs.read_dir("/").expect("fixme") } {
         match long {
             false => println!("{:?}", f),
             true  => println!("{:#?}", f),
@@ -79,9 +79,9 @@ pub fn cp_from_image(fs: &impl FileSystem, src: &Path, dest: &Path) -> anyhow::R
         .to_uppercase();
     let data = fs.read_file(&source_file)?;
     let file = fs.stat(&source_file).unwrap();
-    print!("{} -> {}", file.name, local_dest.to_string_lossy());
+    print!("{} -> {}", file.file_name(), local_dest.to_string_lossy());
     std::fs::write(local_dest, data.as_bytes())?;
-    print!("... Successfully copied {} blocks ({} bytes)\n", file.length, file.length * BLOCK_SIZE);
+    print!("... Successfully copied {} blocks ({} bytes)\n", file.blocks(), file.len());
     Ok(())
 }
 

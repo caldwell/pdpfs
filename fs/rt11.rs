@@ -1,6 +1,6 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-use std::{cmp::min, io, io::ErrorKind, fmt::Debug, ops::{Deref, DerefMut}};
+use std::{cmp::min, io, io::ErrorKind, fmt::Debug};
 
 use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
@@ -114,6 +114,10 @@ impl<B: BlockDevice> RT11FS<B> {
         self.find(|f| f.kind == EntryKind::Permanent && f.name == name)
     }
 
+    fn raw_stat<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
+        self.find_file_named(name).map(|(segment, entry)| &self.dir[segment].entries[entry])
+    }
+
     fn write_directory_segment(&mut self, segment: usize) -> anyhow::Result<()> {
         self.image.write_blocks(self.dir[segment].block as usize, 2, &self.dir[segment].repr()?)
     }
@@ -128,37 +132,44 @@ impl<B: BlockDevice> RT11FS<B> {
         self.dir[segment].entries[entry].length += self.dir[segment].entries[entry+1].length;
         self.dir[segment].entries.drain(entry+1..=entry+1);
     }
+
+    fn full_dir_iter<'a>(&'a self, kind: Option<EntryKind>) -> DirEntryIterator<'a, B> {
+        DirEntryIterator {
+            fs: self,
+            segment: 0,
+            entry: 0,
+            kind,
+        }
+    }
 }
 
 impl<B: BlockDevice> FileSystem for RT11FS<B> {
     type BlockDevice=B;
 
-    fn dir_iter<'a>(&'a self) -> DirEntryIterator<'a, B> {
-        DirEntryIterator {
-            fs: self,
-            segment: 0,
-            entry: 0,
-        }
+    fn dir_iter<'a>(&'a self, _path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn super::DirEntry + 'a>> + 'a>> {
+        Ok(Box::new(self.full_dir_iter(None)
+            .map(|e| -> Box<dyn super::DirEntry> { return Box::new(e) })))
     }
 
-    fn file_iter<'a>(&'a self) -> std::iter::Filter<DirEntryIterator<'a, B>, Box<dyn FnMut(&&'a DirEntry) -> bool>> {
-        self.dir_iter().filter(Box::new(|e: &&'a DirEntry| e.kind == EntryKind::Permanent))
+    fn read_dir<'a>(&'a self, _path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn super::DirEntry + 'a>> + 'a>> {
+        Ok(Box::new(self.full_dir_iter(Some(EntryKind::Permanent))
+            .map(|e| -> Box<dyn super::DirEntry> { return Box::new(e) })))
     }
 
-    fn stat<'a>(&'a self, name: &str) -> Option<&'a DirEntry> {
-        self.file_iter().find(|f| f.name == name)
+    fn stat<'a>(&'a self, name: &str) -> Option<Box<dyn super::DirEntry + 'a>> {
+        self.read_dir("").unwrap().find(|f| f.file_name() == name)
     }
 
     fn free_blocks(&self) -> usize {
-        self.dir_iter().filter(|e| e.kind == EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+        self.full_dir_iter(None).filter(|e| e.kind == EntryKind::Empty).fold(0, |acc, e| acc + e.length)
     }
 
     fn used_blocks(&self) -> usize {
-        self.dir_iter().filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
+        self.full_dir_iter(None).filter(|e| e.kind != EntryKind::Empty).fold(0, |acc, e| acc + e.length)
     }
 
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> {
-        let Some(file) = self.stat(&name) else {
+        let Some(file) = self.raw_stat(&name) else {
             return Err(anyhow!("File not found: {}", name));
         };
         self.image.read_blocks(file.block, file.length)
@@ -496,7 +507,7 @@ pub struct DirEntry {
     pub block: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum EntryKind {
     Tentative,
     Empty,
@@ -632,23 +643,42 @@ impl Debug for DirEntry {
     }
 }
 
+impl super::DirEntry for &DirEntry {
+    fn path(&self)       -> &str                             { &self.name }
+    fn file_name(&self)  -> &str                             { &self.name }
+    fn is_dir(&self)     -> bool                             { false }
+    fn is_file(&self)    -> bool                             { self.kind == EntryKind::Permanent }
+    fn is_symlink(&self) -> bool                             { false }
+    fn len(&self)        -> u64                              { (self.length * BLOCK_SIZE) as u64 }
+    fn modified(&self)   -> anyhow::Result<super::Timestamp> { Err(anyhow!("Not available")) }
+    fn accessed(&self)   -> anyhow::Result<super::Timestamp> { Err(anyhow!("Not available")) }
+    fn created(&self)    -> anyhow::Result<super::Timestamp> { self.creation_date.map(|d| super::Timestamp::Date(d)).ok_or(anyhow!("Bad Date")) }
+    fn blocks(&self)     -> u64                              { self.length as u64}
+    fn readonly(&self)   -> bool                             { self.read_only }
+}
+
 pub struct DirEntryIterator<'a, B: BlockDevice> {
     fs: &'a RT11FS<B>,
     segment: usize,
     entry: usize,
+    kind: Option<EntryKind>, // None means all. :-)
 }
 
 impl<'a, B: BlockDevice> Iterator for DirEntryIterator<'a, B> {
     type Item = &'a DirEntry;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.segment >= self.fs.dir.len() { return None }
-        let entry = &self.fs.dir[self.segment].entries[self.entry];
-        self.entry += 1;
-        if self.entry >= self.fs.dir[self.segment].entries.len() {
-            self.segment += 1;
-            self.entry = 0;
+        loop {
+            if self.segment >= self.fs.dir.len() { return None }
+            let entry = &self.fs.dir[self.segment].entries[self.entry];
+            self.entry += 1;
+            if self.entry >= self.fs.dir[self.segment].entries.len() {
+                self.segment += 1;
+                self.entry = 0;
+            }
+            if self.kind.is_none() || self.kind == Some(entry.kind) {
+                return Some(entry);
+            }
         }
-        Some(entry)
     }
 }
 
@@ -873,7 +903,7 @@ mod test {
             f.write(&incrementing(256)).expect("write");
         }
         fs.delete("TEST.TXT").expect("delete test.txt");
-        assert_eq!(fs.stat("TEST.TXT"), None);
+        assert_eq!(fs.stat("TEST.TXT").is_none(), true);
         assert_eq!(fs.used_blocks(), 0);
         assert_block_eq!(fs.image, 6,
             vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x02, ____, ____, ____, ____,
