@@ -25,7 +25,11 @@ impl PhysicalBlockDevice for IMG {
         let start = cylinder * self.geometry.sectors * self.geometry.heads
                           + head   * self.geometry.sectors
                           + sector;
-        Ok(self.data[start*self.geometry.sector_size..(start + 1)*self.geometry.sector_size].to_owned())
+        let start_bytes = start*self.geometry.sector_size;
+        if start_bytes >= self.data.len() || start_bytes + self.geometry.sector_size > self.data.len() {
+            return Err(anyhow!("Read past end of device {}..{} > {}", start, start+1, self.data.len() / self.geometry.sector_size))
+        }
+        Ok(self.data[start_bytes..start_bytes + self.geometry.sector_size].to_owned())
     }
 
     fn write_sector(&mut self, cylinder: usize, head: usize, sector: usize, buf: &[u8]) -> anyhow::Result<()> {
@@ -33,7 +37,11 @@ impl PhysicalBlockDevice for IMG {
         let start = cylinder * self.geometry.sectors * self.geometry.heads
                           + head   * self.geometry.sectors
                           + sector;
-        self.data.splice(start*self.geometry.sector_size..(start + 1)*self.geometry.sector_size,
+        let start_bytes = start*self.geometry.sector_size;
+        if start_bytes >= self.data.len() || start_bytes + self.geometry.sector_size > self.data.len() {
+            return Err(anyhow!("Write past end of device {}..{} > {}", start, start+1, self.data.len() / self.geometry.sector_size))
+        }
+        self.data.splice(start_bytes..start_bytes + self.geometry.sector_size,
             buf.into_iter().map(|b| *b));
         Ok(())
     }
