@@ -141,6 +141,38 @@ impl<B: BlockDevice> RT11FS<B> {
             kind,
         }
     }
+
+    fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
+        let blocks = (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        DirEntry::encode_filename(name)?;
+        _ = self.delete(name); // Can only fail because file-not-found, which is a no-op here.
+        let Some((segment, entry)) = self.find_empty_space(blocks) else { return Err(anyhow!("No space available in image")) };
+        if self.dir[segment].entries.len() + 1 > self.dir[segment].max_entries() {
+            // Too many entries to fit in segment.
+            // We _should_ split the segment here but I don't want to write that yet :-)
+            return Err(anyhow!("No more entries in the segment and splitting segments is not implemented yet!"));
+        }
+        let mut new_free = self.dir[segment].entries[entry].clone();
+        self.dir[segment].entries[entry].name = name.to_owned();
+        self.dir[segment].entries[entry].length = blocks;
+        self.dir[segment].entries[entry].kind = EntryKind::Permanent;
+        self.dir[segment].entries[entry].read_only = false;
+        self.dir[segment].entries[entry].protected = false;
+        self.dir[segment].entries[entry].job = 0;
+        self.dir[segment].entries[entry].channel = 0;
+        self.dir[segment].entries[entry].creation_date = Some(Local::now().date_naive());
+        new_free.block += blocks;
+        new_free.length -= blocks;
+        self.dir[segment].entries.insert(entry+1, new_free);
+        self.write_directory_segment(segment)?;
+        Ok(RT11FileWriter{
+            image: &mut self.image,
+            direntry: &self.dir[segment].entries[entry],
+            residue: vec![],
+            pos: 0,
+        })
+    }
+
 }
 
 impl<B: BlockDevice> FileSystem for RT11FS<B> {
@@ -175,35 +207,11 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         self.image.read_blocks(file.block, file.length)
     }
 
-    fn create<'a>(&'a mut self, name: &str, bytes: usize) -> anyhow::Result<RT11FileWriter<'a, B>> {
-        let blocks = (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
-        DirEntry::encode_filename(name)?;
-        _ = self.delete(name); // Can only fail because file-not-found, which is a no-op here.
-        let Some((segment, entry)) = self.find_empty_space(blocks) else { return Err(anyhow!("No space available in image")) };
-        if self.dir[segment].entries.len() + 1 > self.dir[segment].max_entries() {
-            // Too many entries to fit in segment.
-            // We _should_ split the segment here but I don't want to write that yet :-)
-            return Err(anyhow!("No more entries in the segment and splitting segments is not implemented yet!"));
-        }
-        let mut new_free = self.dir[segment].entries[entry].clone();
-        self.dir[segment].entries[entry].name = name.to_owned();
-        self.dir[segment].entries[entry].length = blocks;
-        self.dir[segment].entries[entry].kind = EntryKind::Permanent;
-        self.dir[segment].entries[entry].read_only = false;
-        self.dir[segment].entries[entry].protected = false;
-        self.dir[segment].entries[entry].job = 0;
-        self.dir[segment].entries[entry].channel = 0;
-        self.dir[segment].entries[entry].creation_date = Some(Local::now().date_naive());
-        new_free.block += blocks;
-        new_free.length -= blocks;
-        self.dir[segment].entries.insert(entry+1, new_free);
-        self.write_directory_segment(segment)?;
-        Ok(RT11FileWriter{
-            image: &mut self.image,
-            direntry: &self.dir[segment].entries[entry],
-            residue: vec![],
-            pos: 0,
-        })
+    fn write_file(&mut self, name: &str, contents: &Vec<u8>) -> anyhow::Result<()> {
+        use std::io::Write;
+        let mut fh = self.create(name, contents.len() as usize)?;
+        fh.write(&contents)?;
+        Ok(())
     }
 
     fn delete(&mut self, name: &str) -> anyhow::Result<()> {

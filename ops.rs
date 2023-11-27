@@ -11,7 +11,6 @@ use crate::fs::{FileSystem,DirEntry};
 use crate::fs::rt11::{DirSegment,RT11FS};
 
 use std::fs::rename;
-use std::io::Write;
 use std::path::{PathBuf, Path};
 
 use anyhow::{anyhow, Context};
@@ -86,15 +85,12 @@ pub fn cp_from_image(fs: &impl FileSystem, src: &Path, dest: &Path) -> anyhow::R
 }
 
 pub fn cp_into_image(fs: &mut impl FileSystem, src: &Path, dest: &Path) -> anyhow::Result<()> {
-    let m = src.metadata()?;
     let dest = match dest {
         d if d == Path::new(".") => Path::new(src.file_name().ok_or_else(|| anyhow!("Need source filename to use '.'"))?),
         d => d,
     };
-    let mut fh = fs.create(&path_to_rt11_filename(dest)?,
-                           m.len() as usize)?;
     let buf = std::fs::read(src)?;
-    fh.write(&buf)?;
+    fs.write_file(&path_to_rt11_filename(dest)?, &buf)?;
     Ok(())
 }
 
