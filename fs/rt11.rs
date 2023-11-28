@@ -53,7 +53,7 @@ impl<B: BlockDevice> RT11FS<B> {
     }
 
     // Initialize a filesystem on this image
-    pub fn init(mut image: B) -> anyhow::Result<RT11FS<B>> {
+    pub fn mkfs(mut image: B) -> anyhow::Result<RT11FS<B>> {
         let home = HomeBlock::new();
         image.write_blocks(1, 1, &home.repr()?)?;
         let dir_segment = DirSegment::new(home.directory_start_block, 4, image.blocks() as u16);
@@ -774,7 +774,7 @@ mod test {
     #[test]
     fn test_init() {
         let dev = TestDev(vec![0;512*20]);
-        let fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         for b in 0..20 {
             match b {
                 1 => assert_block_eq!(fs.image, 1,
@@ -794,7 +794,7 @@ mod test {
     #[test]
     fn test_write() {
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         { fs.create("TEST.TXT", 512).expect("write test.txt"); }
         assert_block_eq!(fs.image, 6,
             vec![0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x04, 0xdb, 0x7d, 0x00, 0x7d,
@@ -803,7 +803,7 @@ mod test {
             vec![0; 512-40]);
         assert_block_eq!(fs.image, 14, vec![0; 512]);
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         { let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             f.write(&incrementing(512)).expect("write"); }
         assert_block_eq!(fs.image, 14, incrementing(512));
@@ -812,7 +812,7 @@ mod test {
     #[test]
     fn test_write_chunk() {
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         {
             let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             assert_eq!(f.pos, 0);
@@ -827,7 +827,7 @@ mod test {
     #[test]
     fn test_write_partial_block() {
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         {
             let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             f.write(&incrementing(256)).expect("write");
@@ -838,7 +838,7 @@ mod test {
     #[test]
     fn test_overwrite_file() {
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         {
             let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             f.write(&incrementing(256)).expect("write");
@@ -855,7 +855,7 @@ mod test {
     #[test]
     fn test_remove_file() {
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         {
             let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             f.write(&incrementing(256)).expect("write");
@@ -872,7 +872,7 @@ mod test {
     #[test]
     fn test_coalesce_empty() {
         let dev = TestDev(vec![0;512*20]);
-        let mut fs = RT11FS::init(dev).expect("Create RT-11 FS");
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
         {
             let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             f.write(&incrementing(256)).expect("write");

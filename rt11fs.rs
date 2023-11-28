@@ -24,7 +24,7 @@ Usage:
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
   rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
   rt11fs [-h] -i <image> rm <file>
-  rt11fs [-h] -i <image> init <device-type> <filesystem>
+  rt11fs [-h] -i <image> mkfs <device-type> <filesystem>
   rt11fs [-h] -i <image> dump [--sector]
   rt11fs [-h] -i <image> dump-home
   rt11fs [-h] -i <image> dump-dir
@@ -77,7 +77,7 @@ Options:
 
    Dumps the image, de-interleaving floppy images.
 
- init:
+ mkfs:
    Initializes a new image. The <image> file specified by `-i` will be created
    and must _not_ already exist.
 
@@ -105,7 +105,7 @@ struct Args {
     cmd_dump:         bool,
     cmd_dump_home:    bool,
     cmd_dump_dir:     bool,
-    cmd_init:         bool,
+    cmd_mkfs:         bool,
     cmd_convert:      bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
@@ -121,8 +121,8 @@ fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|e| e.exit());
 
     // Do this very early since we normally die if the image file doesn't exist
-    if args.cmd_init {
-        return init(&args.flag_image, args.arg_device_type.unwrap(), args.arg_filesystem.unwrap());
+    if args.cmd_mkfs {
+        return create_image(&args.flag_image, args.arg_device_type.unwrap(), args.arg_filesystem.unwrap());
     }
 
     let dev = open_device(&args.flag_image)?;

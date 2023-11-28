@@ -178,19 +178,19 @@ pub fn mv(fs: &mut impl FileSystem, src: &Path, dest: &Path, overwrite_dest: boo
     fs.rename(&path_to_rt11_filename(src)?, &path_to_rt11_filename(dest)?)
 }
 
-pub fn init(image: &Path, dtype: DeviceType, fstype: FileSystemType) -> anyhow::Result<()> {
+pub fn create_image(image: &Path, dtype: DeviceType, fstype: FileSystemType) -> anyhow::Result<()> {
     let ext = image.extension().and_then(|oss| oss.to_str());
     match (dtype, ext) {
-        (DeviceType::RX01, Some("img")) => return init_fs(image, fstype, RX(IMG::from_raw(vec![0; 256256], RX01_GEOMETRY))),
-        (DeviceType::RX01, Some("imd")) => return init_fs(image, fstype, RX(IMD::from_raw(vec![0; 256256], RX01_GEOMETRY))),
+        (DeviceType::RX01, Some("img")) => return mkfs(image, fstype, RX(IMG::from_raw(vec![0; 256256], RX01_GEOMETRY))),
+        (DeviceType::RX01, Some("imd")) => return mkfs(image, fstype, RX(IMD::from_raw(vec![0; 256256], RX01_GEOMETRY))),
         (DeviceType::RX01, Some(ext)) => return Err(anyhow!("Unknown image type {}", ext)),
         (DeviceType::RX01, None)      => return Err(anyhow!("Unknown image type for {}", image.to_string_lossy())),
     }
 }
 
-pub fn init_fs<B: BlockDevice+ 'static>(path: &Path, fstype: FileSystemType, image: B) -> anyhow::Result<()> {
+pub fn mkfs<B: BlockDevice+ 'static>(path: &Path, fstype: FileSystemType, image: B) -> anyhow::Result<()> {
     let fs: Box<dyn FileSystem<BlockDevice = B>> = match fstype {
-        FileSystemType::RT11 => Box::new(RT11FS::init(image)?),
+        FileSystemType::RT11 => Box::new(RT11FS::mkfs(image)?),
         FileSystemType::XXDP => Box::new(XxdpFs::mkfs(image)?),
     };
     save_image(fs.block_device().physical_device(), path)?;
