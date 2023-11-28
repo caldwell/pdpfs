@@ -17,7 +17,7 @@ pub trait FileSystem : Send + Sync {
     fn free_blocks(&self) -> usize;
     fn used_blocks(&self) -> usize;
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer>;
-    fn write_file(&mut self, name: &str, contents: &Vec<u8>) -> anyhow::Result<()>;
+    fn write_file(&mut self, name: &str, contents: &[u8]) -> anyhow::Result<()>;
     fn delete(&mut self, name: &str) -> anyhow::Result<()>;
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()>;
     fn block_device(&self) -> &Self::BlockDevice;
@@ -32,7 +32,7 @@ impl<B: BlockDevice+Send+Sync> FileSystem for Box<dyn FileSystem<BlockDevice = B
     fn free_blocks(&self) -> usize { self.deref().free_blocks() }
     fn used_blocks(&self) -> usize { self.deref().used_blocks() }
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> { self.deref().read_file(name) }
-    fn write_file(&mut self, name: &str, contents: &Vec<u8>) -> anyhow::Result<()> { self.deref_mut().write_file(name, contents) }
+    fn write_file(&mut self, name: &str, contents: &[u8]) -> anyhow::Result<()> { self.deref_mut().write_file(name, contents) }
     fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
     fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> { self.deref_mut().rename(src, dest) }
     fn block_device(&self) -> &B { self.deref().block_device() }

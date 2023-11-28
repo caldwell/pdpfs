@@ -207,7 +207,7 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         self.image.read_blocks(file.block, file.length)
     }
 
-    fn write_file(&mut self, name: &str, contents: &Vec<u8>) -> anyhow::Result<()> {
+    fn write_file(&mut self, name: &str, contents: &[u8]) -> anyhow::Result<()> {
         use std::io::Write;
         let mut fh = self.create(name, contents.len() as usize)?;
         fh.write(&contents)?;
