@@ -4,6 +4,7 @@ pub mod rt11;
 
 use std::{ops::{Deref, DerefMut}, fmt::Debug};
 
+use anyhow::anyhow;
 use bytebuffer::ByteBuffer;
 
 use crate::block::BlockDevice;
@@ -19,8 +20,19 @@ pub trait FileSystem : Send + Sync {
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer>;
     fn write_file(&mut self, name: &str, contents: &[u8]) -> anyhow::Result<()>;
     fn delete(&mut self, name: &str) -> anyhow::Result<()>;
-    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()>;
     fn block_device(&self) -> &Self::BlockDevice;
+    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> {
+        if src == dest { return Ok(()) } // Gotta check for this otherwise we'd delete ourselves below!
+        // Can't combine this with find_file_named() below because the (segment,entry)
+        // might change after we delete the dest (due to coalesce_empty()). And we don't
+        // want to delete the dest _before_ error checking.
+        if !self.stat(src).is_some() { return Err(anyhow!("File not found")) };
+        if self.stat(dest).is_some() {
+            self.delete(dest)?;
+        }
+        self.rename_unchecked(src, dest)
+    }
+    fn rename_unchecked(&mut self, src: &str, dest: &str) -> anyhow::Result<()>;
 }
 
 // It's really a shame this isn't automatic or derivable or something.
@@ -34,7 +46,7 @@ impl<B: BlockDevice+Send+Sync> FileSystem for Box<dyn FileSystem<BlockDevice = B
     fn read_file(&self, name: &str) -> anyhow::Result<ByteBuffer> { self.deref().read_file(name) }
     fn write_file(&mut self, name: &str, contents: &[u8]) -> anyhow::Result<()> { self.deref_mut().write_file(name, contents) }
     fn delete(&mut self, name: &str) -> anyhow::Result<()> { self.deref_mut().delete(name) }
-    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> { self.deref_mut().rename(src, dest) }
+    fn rename_unchecked(&mut self, src: &str, dest: &str) -> anyhow::Result<()> { self.deref_mut().rename_unchecked(src, dest) }
     fn block_device(&self) -> &B { self.deref().block_device() }
 }
 

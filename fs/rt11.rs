@@ -225,16 +225,8 @@ impl<B: BlockDevice> FileSystem for RT11FS<B> {
         Ok(())
     }
 
-    fn rename(&mut self, src: &str, dest: &str) -> anyhow::Result<()> {
+    fn rename_unchecked(&mut self, src: &str, dest: &str) -> anyhow::Result<()> {
         DirEntry::encode_filename(dest)?;
-        if src == dest { return Ok(()) } // Gotta check for this otherwise we'd delete ourselves below!
-        // Can't combine this with find_file_named() below because the (segment,entry)
-        // might change after we delete the dest (due to coalesce_empty()). And we don't
-        // want to delete the dest _before_ error checking.
-        if !self.stat(src).is_some() { return Err(anyhow!("File not found")) };
-        if self.stat(dest).is_some() {
-            self.delete(dest)?;
-        }
         let (segment, entry) = self.find_file_named(src).unwrap(/*we already checked*/);
         self.dir[segment].entries[entry].name = dest.to_owned();
         self.write_directory_segment(segment)?;
