@@ -194,6 +194,10 @@ impl<B: BlockDevice> RT11FS<B> {
 impl<B: BlockDevice> FileSystem for RT11FS<B> {
     type BlockDevice=B;
 
+    fn filesystem_name(&self) -> &str {
+        "RT-11"
+    }
+
     fn dir_iter<'a>(&'a self, _path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn super::DirEntry + 'a>> + 'a>> {
         Ok(Box::new(self.full_dir_iter(None)
             .map(|e| -> Box<dyn super::DirEntry> { return Box::new(e) })))

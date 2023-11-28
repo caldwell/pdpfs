@@ -299,6 +299,10 @@ impl<B: BlockDevice> XxdpFs<B> {
 impl<B: BlockDevice> FileSystem for XxdpFs<B> {
     type BlockDevice=B;
 
+    fn filesystem_name(&self) -> &str {
+        "XXDP"
+    }
+
     fn dir_iter<'a>(&'a self, path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn super::DirEntry + 'a>> + 'a>> {
         if path != "/" { return Err(anyhow!("Bad path")) }
         Ok(Box::new(self.full_dir_iter()

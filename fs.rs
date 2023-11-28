@@ -13,6 +13,7 @@ use crate::block::BlockDevice;
 pub trait FileSystem : Send + Sync {
     type BlockDevice: BlockDevice;
 
+    fn filesystem_name(&self) -> &str;
     fn dir_iter<'a>(&'a self, path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn DirEntry + 'a>> + 'a>>;
     fn read_dir<'a>(&'a self, path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn DirEntry + 'a>> + 'a>>;
     fn stat<'a>(&'a self, name: &str) -> Option<Box<dyn DirEntry + 'a>>;
@@ -39,6 +40,7 @@ pub trait FileSystem : Send + Sync {
 // It's really a shame this isn't automatic or derivable or something.
 impl<B: BlockDevice+Send+Sync> FileSystem for Box<dyn FileSystem<BlockDevice = B>> {
     type BlockDevice = B;
+    fn filesystem_name(&self) -> &str { self.deref().filesystem_name() }
     fn dir_iter<'a>(&'a self, path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn DirEntry + 'a>> + 'a>> { self.deref().dir_iter(&path) }
     fn read_dir<'a>(&'a self, path: &str) -> anyhow::Result<Box<dyn Iterator<Item=Box<dyn DirEntry + 'a>> + 'a>> { self.deref().read_dir(&path) }
     fn stat<'a>(&'a self, name: &str) -> Option<Box<dyn DirEntry + 'a>> { self.deref().stat(name) }
