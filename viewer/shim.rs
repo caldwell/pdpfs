@@ -12,7 +12,6 @@ use neon::prelude::*;
 
 use make_neon_usable::*;
 use pdpfs::fs::{FileSystem, Timestamp};
-use pdpfs::fs::rt11::RT11FS;
 use pdpfs::block::BlockDevice;
 
 #[neon::main]
@@ -57,7 +56,7 @@ fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
 
     let id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-    let fs = Box::new(RT11FS::new(pdpfs::ops::open_device(&Path::new(&image_file)).expect("phys image bad")).expect("fs bad"));
+    let fs = pdpfs::ops::open_fs(pdpfs::ops::open_device(&Path::new(&image_file)).expect("phys image bad")).expect("fs bad");
 
     IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
 
