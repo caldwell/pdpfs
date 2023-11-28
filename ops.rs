@@ -60,6 +60,18 @@ pub fn open_device(image_file: &Path) -> anyhow::Result<Box<dyn BlockDevice>> {
     })
 }
 
+pub fn open_fs(dev: Box<dyn BlockDevice>) -> anyhow::Result<Box<dyn FileSystem<BlockDevice = Box<dyn BlockDevice>>>> {
+    let fs: Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>> =
+        if XxdpFs::image_is(&dev) {
+            Box::new(XxdpFs::new(dev)?)
+        } else if RT11FS::image_is(&dev) {
+            Box::new(RT11FS::new(dev)?)
+        } else {
+            return Err(anyhow!("Unknown filesystem on image"));
+        };
+    Ok(fs)
+}
+
 pub fn ls(fs: &impl FileSystem, long: bool, all: bool) {
     for f in if all { Box::new(fs.dir_iter("/").expect("fixme")) as Box<dyn Iterator<Item = Box<dyn DirEntry>>> }
              else   { fs.read_dir("/").expect("fixme") } {

@@ -7,8 +7,6 @@ mod ops;
 use std::path::PathBuf;
 
 use block::BlockDevice;
-use fs::rt11::RT11FS;
-use fs::xxdp::XxdpFs;
 use ops::*;
 
 use anyhow::anyhow;
@@ -144,14 +142,7 @@ fn main() -> anyhow::Result<()> {
         return convert(&dev, args.arg_image_type.unwrap(), &args.arg_dest_file);
     }
 
-    let mut fs: Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>> =
-        if XxdpFs::image_is(&dev) {
-            Box::new(XxdpFs::new(dev)?)
-        } else if RT11FS::image_is(&dev) {
-            Box::new(RT11FS::new(dev)?)
-        } else {
-            return Err(anyhow!("Unknown filesystem on image"));
-        };
+    let mut fs = open_fs(dev)?;
 
     if args.cmd_ls {
         ls(&fs, args.flag_long, args.flag_all);
