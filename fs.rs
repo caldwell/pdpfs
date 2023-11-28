@@ -1,6 +1,7 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
 pub mod rt11;
+pub mod xxdp;
 
 use std::{ops::{Deref, DerefMut}, fmt::Debug};
 

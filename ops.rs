@@ -7,6 +7,7 @@ use crate::block::flat::Flat;
 use crate::block::imd::IMD;
 use crate::block::img::IMG;
 use crate::block::rx::{RX, RX01_GEOMETRY, RX02_GEOMETRY};
+use crate::fs::xxdp::XxdpFs;
 use crate::fs::{FileSystem,DirEntry};
 use crate::fs::rt11::{DirSegment,RT11FS};
 
@@ -28,6 +29,13 @@ pub enum DeviceType {
 pub enum ImageType {
     IMD,
     IMG,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum FileSystemType {
+    RT11,
+    XXDP,
 }
 
 pub fn open_device(image_file: &Path) -> anyhow::Result<Box<dyn BlockDevice>> {
@@ -170,19 +178,22 @@ pub fn mv(fs: &mut impl FileSystem, src: &Path, dest: &Path, overwrite_dest: boo
     fs.rename(&path_to_rt11_filename(src)?, &path_to_rt11_filename(dest)?)
 }
 
-pub fn init(image: &Path, dtype: DeviceType) -> anyhow::Result<()> {
+pub fn init(image: &Path, dtype: DeviceType, fstype: FileSystemType) -> anyhow::Result<()> {
     let ext = image.extension().and_then(|oss| oss.to_str());
     match (dtype, ext) {
-        (DeviceType::RX01, Some("img")) => return init_fs(image, RX(IMG::from_raw(vec![0; 256256], RX01_GEOMETRY))),
-        (DeviceType::RX01, Some("imd")) => return init_fs(image, RX(IMD::from_raw(vec![0; 256256], RX01_GEOMETRY))),
+        (DeviceType::RX01, Some("img")) => return init_fs(image, fstype, RX(IMG::from_raw(vec![0; 256256], RX01_GEOMETRY))),
+        (DeviceType::RX01, Some("imd")) => return init_fs(image, fstype, RX(IMD::from_raw(vec![0; 256256], RX01_GEOMETRY))),
         (DeviceType::RX01, Some(ext)) => return Err(anyhow!("Unknown image type {}", ext)),
         (DeviceType::RX01, None)      => return Err(anyhow!("Unknown image type for {}", image.to_string_lossy())),
     }
 }
 
-pub fn init_fs<B: BlockDevice>(path: &Path, image: B) -> anyhow::Result<()> {
-    let fs = RT11FS::init(image)?;
-    save_image(fs.image.physical_device(), path)?;
+pub fn init_fs<B: BlockDevice+ 'static>(path: &Path, fstype: FileSystemType, image: B) -> anyhow::Result<()> {
+    let fs: Box<dyn FileSystem<BlockDevice = B>> = match fstype {
+        FileSystemType::RT11 => Box::new(RT11FS::init(image)?),
+        FileSystemType::XXDP => Box::new(XxdpFs::mkfs(image)?),
+    };
+    save_image(fs.block_device().physical_device(), path)?;
     Ok(())
 }
 

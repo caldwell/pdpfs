@@ -18,7 +18,7 @@ Find the latest version at https://porkrind.org/rt11fs
     rt11fs [-h] -i <image> cp <source-file> <dest-file>
     rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
     rt11fs [-h] -i <image> rm <file>
-    rt11fs [-h] -i <image> init <device-type>
+    rt11fs [-h] -i <image> init <device-type> <filesystem>
     rt11fs [-h] -i <image> dump [--sector]
     rt11fs [-h] -i <image> dump-home
     rt11fs [-h] -i <image> dump-dir
@@ -88,12 +88,14 @@ Print a debug dump of the fields of the home block.
 
 Print a debug dump of the fields of the directory segments.
 
-#### `init <device-type>`
+#### `init <device-type> <filesystem>`
 
 Initializes a new image. The `<image>` file specified by `-i` will be created
 and must _not_ already exist.
 
 `<device-type>` must be: `rx01`
+
+`<filesystem>` must be one of: `rt11`, `xxdp`
 
 #### `convert <image-type> <dest-file>`
 

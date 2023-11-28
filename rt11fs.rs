@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use block::BlockDevice;
 use fs::rt11::RT11FS;
+use fs::xxdp::XxdpFs;
 use ops::*;
 
 use anyhow::anyhow;
@@ -23,7 +24,7 @@ Usage:
   rt11fs [-h] -i <image> cp <source-file> <dest-file>
   rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
   rt11fs [-h] -i <image> rm <file>
-  rt11fs [-h] -i <image> init <device-type>
+  rt11fs [-h] -i <image> init <device-type> <filesystem>
   rt11fs [-h] -i <image> dump [--sector]
   rt11fs [-h] -i <image> dump-home
   rt11fs [-h] -i <image> dump-dir
@@ -82,6 +83,8 @@ Options:
 
    <device-type> must be: rx01
 
+   <filesystem> must be one of: rt11, xxdp
+
  convert:
    Convert the image to a different image file type.
 
@@ -109,6 +112,7 @@ struct Args {
     arg_file:         PathBuf,
     arg_device_type:  Option<DeviceType>,
     arg_image_type:   Option<ImageType>,
+    arg_filesystem:   Option<FileSystemType>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -118,7 +122,7 @@ fn main() -> anyhow::Result<()> {
 
     // Do this very early since we normally die if the image file doesn't exist
     if args.cmd_init {
-        return init(&args.flag_image, args.arg_device_type.unwrap());
+        return init(&args.flag_image, args.arg_device_type.unwrap(), args.arg_filesystem.unwrap());
     }
 
     let dev = open_device(&args.flag_image)?;
@@ -141,7 +145,9 @@ fn main() -> anyhow::Result<()> {
     }
 
     let mut fs: Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>> =
-        if RT11FS::image_is(&dev) {
+        if XxdpFs::image_is(&dev) {
+            Box::new(XxdpFs::new(dev)?)
+        } else if RT11FS::image_is(&dev) {
             Box::new(RT11FS::new(dev)?)
         } else {
             return Err(anyhow!("Unknown filesystem on image"));
