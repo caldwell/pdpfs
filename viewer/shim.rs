@@ -25,6 +25,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("rm", rm)?;
     cx.export_function("save", save)?;
     cx.export_function("convert", convert)?;
+    cx.export_function("filesystem_name", filesystem_name)?;
     Ok(())
 }
 
@@ -155,4 +156,12 @@ fn convert(mut cx: FunctionContext) -> JsResult<JsNull> {
             .and_then(|_| { image.dirty = true; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
+}
+
+fn filesystem_name(mut cx: FunctionContext) -> JsResult<JsString> {
+    js_args!(&mut cx, id: u32);
+    let fs_name = with_image_id(id, |image| {
+        Result::<_,String>::Ok(cx.string(&image.fs.filesystem_name()))
+    }).into_jserr(&mut cx)?;
+    Ok(fs_name)
 }

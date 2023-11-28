@@ -36,7 +36,7 @@ function open_image(image_path) {
     temp_path[id] = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
     pdpfs.extract_to_path(id, temp_path[id]);
 
-    create_fs_window(`RT-11: ${image_path}`, id);
+    create_fs_window(`${pdpfs.filesystem_name(id)}: ${image_path}`, id);
 }
 
 ipcMain.handle('pdpfs:get_directory_entries', async (event, ...args) => pdpfs.get_directory_entries(...args));
