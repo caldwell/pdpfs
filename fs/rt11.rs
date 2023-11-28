@@ -36,6 +36,22 @@ impl<B: BlockDevice> RT11FS<B> {
         })
     }
 
+    pub fn image_is(image: &B) -> bool {
+        let Ok(home) = Self::read_homeblock(&image) else { return false };
+        let Ok(dir) = Self::read_directory(&image, home.directory_start_block).collect::<anyhow::Result<Vec<DirSegment>>>() else {
+            return false;
+        };
+        for s in dir.into_iter() {
+            for e in s.entries.iter() {
+                // Do a sanity check on all the directory entries. They should have sane block numbers.
+                if e.length >= image.blocks() || e.block >= image.blocks() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     // Initialize a filesystem on this image
     pub fn init(mut image: B) -> anyhow::Result<RT11FS<B>> {
         let home = HomeBlock::new();

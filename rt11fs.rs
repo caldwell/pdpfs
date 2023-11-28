@@ -14,6 +14,8 @@ use anyhow::anyhow;
 use docopt::Docopt;
 use serde::Deserialize;
 
+use crate::fs::FileSystem;
+
 const USAGE: &'static str = "
 Usage:
   rt11fs -h
@@ -138,7 +140,12 @@ fn main() -> anyhow::Result<()> {
         return convert(&dev, args.arg_image_type.unwrap(), &args.arg_dest_file);
     }
 
-    let mut fs = RT11FS::new(dev)?;
+    let mut fs: Box<dyn FileSystem<BlockDevice=Box<dyn BlockDevice>>> =
+        if RT11FS::image_is(&dev) {
+            Box::new(RT11FS::new(dev)?)
+        } else {
+            return Err(anyhow!("Unknown filesystem on image"));
+        };
 
     if args.cmd_ls {
         ls(&fs, args.flag_long, args.flag_all);
@@ -149,7 +156,7 @@ fn main() -> anyhow::Result<()> {
                args.arg_dest_file  .to_string_lossy().chars().find(|c| std::path::is_separator(*c)).is_some()) {
             (false, true)  => cp_from_image(&fs, &args.arg_source_file, &args.arg_dest_file)?,
             (true,  false) => { cp_into_image(&mut fs, &args.arg_source_file, &args.arg_dest_file)?;
-                                save_image(fs.image.physical_device(), &args.flag_image)? },
+                                save_image(fs.block_device().physical_device(), &args.flag_image)? },
             (false, false) => Err(anyhow!("Image to image copy is not supported yet."))?,
             (true,  true)  => Err(anyhow!("Either the source or destination file needs to be on the image"))?,
         }
@@ -157,12 +164,12 @@ fn main() -> anyhow::Result<()> {
 
     if args.cmd_rm {
         rm(&mut fs, &args.arg_file)?;
-        save_image(fs.image.physical_device(), &args.flag_image)?;
+        save_image(fs.block_device().physical_device(), &args.flag_image)?;
     }
 
     if args.cmd_mv {
         mv(&mut fs, &args.arg_source_file, &args.arg_dest_file, args.flag_force)?;
-        save_image(fs.image.physical_device(), &args.flag_image)?;
+        save_image(fs.block_device().physical_device(), &args.flag_image)?;
     }
 
     Ok(())
