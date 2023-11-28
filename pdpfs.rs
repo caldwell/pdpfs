@@ -51,14 +51,14 @@ Options:
 
    Examples:
      # These both copy 'file.txt' from the local machine into disk image (as FILE.TXT):
-     rt11fs -i my_image.img cp ./file.txt file.txt
-     rt11fs -i my_image.img cp ./file.txt .
+     pdpfs -i my_image.img cp ./file.txt file.txt
+     pdpfs -i my_image.img cp ./file.txt .
 
      # This copies 'FILE.TXT' from the disk image into /tmp/FILE.TXT on the local machine:
-     rt11fs -i my_image.img cp FILE.TXT /tmp
+     pdpfs -i my_image.img cp FILE.TXT /tmp
 
      # This copies 'FILE.TXT' from the image into './file.txt' on the local machine:
-     rt11fs -i my_image.img cp file.txt ./
+     pdpfs -i my_image.img cp file.txt ./
 
  mv:
    -f --force            Overwrite destination file if it exists.

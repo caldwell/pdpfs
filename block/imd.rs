@@ -87,7 +87,7 @@ impl IMD {
 
     pub fn from_raw_bytes(data: Vec<u8>, g: Geometry)  -> IMD {
         IMD {
-            comment: format!("IMD 1.18: {}\nConverted from IMG by rt11fs[1]\n[1]: https://porkrind.org/rt11fs\n",
+            comment: format!("IMD 1.18: {}\nConverted from IMG by pdpfs[1]\n[1]: https://porkrind.org/pdpfs\n",
                 chrono::Local::now().format("%m/%d/Y %H:%M:%S")),
             track: (0..g.cylinders).map(|c| {
                 (0..g.heads).map(|h| {
