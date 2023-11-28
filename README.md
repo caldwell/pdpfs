@@ -1,4 +1,4 @@
-rt11fs
+pdpfs
 ======
 
 Manipulate RT-11 Filesystems on disk images.
@@ -9,20 +9,20 @@ called ".img").
 
 It currently supports RX-01 images and flat hard disk images over 1MB.
 
-Find the latest version at https://porkrind.org/rt11fs
+Find the latest version at https://porkrind.org/pdpfs
 
 ## Usage
 
-    rt11fs -h
-    rt11fs [-h] -i <image> ls [-l] [-a]
-    rt11fs [-h] -i <image> cp <source-file> <dest-file>
-    rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
-    rt11fs [-h] -i <image> rm <file>
-    rt11fs [-h] -i <image> mkfs <device-type> <filesystem>
-    rt11fs [-h] -i <image> dump [--sector]
-    rt11fs [-h] -i <image> dump-home
-    rt11fs [-h] -i <image> dump-dir
-    rt11fs [-h] -i <image> convert <image-type> <dest-file>
+    pdpfs -h
+    pdpfs [-h] -i <image> ls [-l] [-a]
+    pdpfs [-h] -i <image> cp <source-file> <dest-file>
+    pdpfs [-h] -i <image> mv [-f] <source-file> <dest-file>
+    pdpfs [-h] -i <image> rm <file>
+    pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
+    pdpfs [-h] -i <image> dump [--sector]
+    pdpfs [-h] -i <image> dump-home
+    pdpfs [-h] -i <image> dump-dir
+    pdpfs [-h] -i <image> convert <image-type> <dest-file>
 
 ### Options:
 
@@ -51,14 +51,14 @@ inside the image (use `./` for the local filesystem).
 Examples:
 
     # These both copy 'file.txt' from the local machine into disk image (as FILE.TXT):
-    rt11fs -i my_image.img cp ./file.txt file.txt
-    rt11fs -i my_image.img cp ./file.txt .
+    pdpfs -i my_image.img cp ./file.txt file.txt
+    pdpfs -i my_image.img cp ./file.txt .
 
     # This copies 'FILE.TXT' from the disk image into /tmp/FILE.TXT on the local machine:
-    rt11fs -i my_image.img cp FILE.TXT /tmp
+    pdpfs -i my_image.img cp FILE.TXT /tmp
 
     # This copies 'FILE.TXT' from the image into './file.txt' on the local machine:
-    rt11fs -i my_image.img cp file.txt ./
+    pdpfs -i my_image.img cp file.txt ./
 
 #### `mv [-f] <source-file> <dest-file>`
 
@@ -107,7 +107,7 @@ Convert the image to a different image file type.
 
 List the contents of an image:
 
-    $ rt11fs -i RT11RX01.IMD ls
+    $ pdpfs -i RT11RX01.IMD ls
     Warning: Bad checksum: computed (9f88) != on disk (0000)
     1988-03-07   0:0       80 RT11SJ.SYS
     1987-09-02   0:0       27 SWAP.SYS
@@ -132,43 +132,43 @@ List the contents of an image:
 
 Delete a file from the image:
 
-    rt11fs -i RT11RX01.IMD rm SWAP.SYS
+    pdpfs -i RT11RX01.IMD rm SWAP.SYS
 
 Copy a file to the local computer (the file with a `/` in the name will be
 interpreted as the local computer).:
 
-    rt11fs -i RT11RX01.IMD cp ./STARTS.COM .
+    pdpfs -i RT11RX01.IMD cp ./STARTS.COM .
 
 Copy a file to the image from the local computer:
 
-    rt11fs -i RT11RX01.IMD cp STARTS.COM ./
+    pdpfs -i RT11RX01.IMD cp STARTS.COM ./
 
 Rename a file on the image:
 
-    rt11fs -i RT11RX01.IMD mv STARTS.COM starts.bak
+    pdpfs -i RT11RX01.IMD mv STARTS.COM starts.bak
 
 Initialize a new blank image (it uses the image extension to figure out the
 image format):
 
-    rt11fs -i new_image.img init rx01
+    pdpfs -i new_image.img init rx01
 
 Or, to create a new IMD image:
 
-    rt11fs -i new_image.imd init rx01
+    pdpfs -i new_image.imd init rx01
 
 Convert an existing image from IMD to IMG format:
 
-    rt11fs -i original.imd convert img new-image.rx01
+    pdpfs -i original.imd convert img new-image.rx01
 
 Convert an existing image from IMG to IMD format:
 
-    rt11fs -i original.img convert imd new-image.imd
+    pdpfs -i original.img convert imd new-image.imd
 
 
 Building
 --------
 
-rt11fs is written in Rust, so you will need the [Rust
+pdpfs is written in Rust, so you will need the [Rust
 compiler](https://rust-lang.org) to be installed in order to build it.
 
 To build it:
@@ -183,7 +183,7 @@ To run the automated tests:
 License
 -------
 
-Copyright © 2022 David Caldwell <david_rt11fs@porkrind.org>
+Copyright © 2022 David Caldwell <david_pdpfs@porkrind.org>
 
 *TLDR: [GPLv3](LICENSE.md). You can redistribute the .exe (or a modified
 version) as long as you ship the source code used to build it alongside.*

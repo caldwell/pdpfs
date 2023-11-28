@@ -19,16 +19,16 @@ use crate::fs::FileSystem;
 
 const USAGE: &'static str = r#"
 Usage:
-  rt11fs -h
-  rt11fs [-h] -i <image> ls [-l] [-a]
-  rt11fs [-h] -i <image> cp <source-file> <dest-file>
-  rt11fs [-h] -i <image> mv [-f] <source-file> <dest-file>
-  rt11fs [-h] -i <image> rm <file>
-  rt11fs [-h] -i <image> mkfs <device-type> <filesystem>
-  rt11fs [-h] -i <image> dump [--sector]
-  rt11fs [-h] -i <image> dump-home
-  rt11fs [-h] -i <image> dump-dir
-  rt11fs [-h] -i <image> convert <image-type> <dest-file>
+  pdpfs -h
+  pdpfs [-h] -i <image> ls [-l] [-a]
+  pdpfs [-h] -i <image> cp <source-file> <dest-file>
+  pdpfs [-h] -i <image> mv [-f] <source-file> <dest-file>
+  pdpfs [-h] -i <image> rm <file>
+  pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
+  pdpfs [-h] -i <image> dump [--sector]
+  pdpfs [-h] -i <image> dump-home
+  pdpfs [-h] -i <image> dump-dir
+  pdpfs [-h] -i <image> convert <image-type> <dest-file>
 
 Options:
   -h --help              Show this screen.

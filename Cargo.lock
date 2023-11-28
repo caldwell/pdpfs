@@ -191,6 +191,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
+name = "pdpfs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytebuffer",
+ "chrono",
+ "docopt",
+ "join-string",
+ "pretty-hex",
+ "radix50",
+ "serde",
+ "whoami",
+]
+
+[[package]]
 name = "pretty-hex"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -251,21 +266,6 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
-
-[[package]]
-name = "rt11fs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytebuffer",
- "chrono",
- "docopt",
- "join-string",
- "pretty-hex",
- "radix50",
- "serde",
- "whoami",
-]
 
 [[package]]
 name = "serde"

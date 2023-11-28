@@ -5,8 +5,8 @@ on:
     tags: [ "[0-9]*" ]
 
 env:
-  PROJECT_NAME: rt11fs
-  BIN_NAME: rt11fs
+  PROJECT_NAME: pdpfs
+  BIN_NAME: pdpfs
   CARGO_TERM_COLOR: always
   VERSION: ${{ github.ref_name }}
 

@@ -1,5 +1,5 @@
 [package]
-name = "rt11fs"
+name = "pdpfs"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,8 +7,8 @@ edition = "2021"
 path="lib.rs"
 
 [[bin]]
-name="rt11fs"
-path="rt11fs.rs"
+name="pdpfs"
+path="pdpfs.rs"
 
 [dependencies]
 radix50 = "0.1"
