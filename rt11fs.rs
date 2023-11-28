@@ -17,7 +17,7 @@ use serde::Deserialize;
 
 use crate::fs::FileSystem;
 
-const USAGE: &'static str = "
+const USAGE: &'static str = r#"
 Usage:
   rt11fs -h
   rt11fs [-h] -i <image> ls [-l] [-a]
@@ -89,7 +89,7 @@ Options:
    Convert the image to a different image file type.
 
    <image-type> must be one of: img, imd
-";
+"#;
 
 #[derive(Debug, Deserialize)]
 struct Args {
