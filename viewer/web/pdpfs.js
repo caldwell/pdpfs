@@ -63,17 +63,17 @@ function diskimageview({image_id}) {
     const [error, set_error] = React.useState(null);
 
     React.useEffect(() => {
-        (async function() {
-            try {
-                const entries = await pdpfs.get_directory_entries();
-                debugger;
-                console.log("setting entries", entries);
-                set_entries(entries);
-            } catch(e) {
-                set_error(e);
-            }
-        })()
-    }, [image_id, set_entries]);
+        let cancelled;
+        pdpfs.get_directory_entries()
+            .then((entries) => { if (!cancelled) set_entries(entries) } )
+            .catch((err) => set_error(err));
+        let handler = (event) => {
+            set_entries(event.detail.entries);
+            set_selection([]); // A bit broad, but safe. Otherwise we need to correlate by name which we don't do.
+        };
+        window.addEventListener("pdpfs:refresh-directory-entries", handler);
+        return () => { cancelled=true; window.removeEventListener("pdpfs:refresh-directory-entries", handler) };
+    }, [image_id]);
 
     // This drop stuff halfway works on tauri: it lets us do the hovering stuff, but the drop part doesn't
     // work. On electron, the drop _does_ work.
