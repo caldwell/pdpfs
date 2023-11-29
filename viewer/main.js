@@ -125,6 +125,15 @@ app.on('menu:file/save', async (event) => {
     })
 })
 
+app.on('menu:file/delete', async (event) => {
+    with_curr_data(async ({window, image, selected, send}) => {
+        for (let file of selected)
+            await pdpfs.rm(image.id, file);
+        send('pdpfs:refresh-directory-entries', { entries: pdpfs.get_directory_entries(image.id) });
+        window.setDocumentEdited(await pdpfs.image_is_dirty(image.id));
+    })
+})
+
 const shortcut = (key)      => process.platform == 'darwin' ? `Cmd+${key}` : `Ctrl+${key}`;
 const mac      = (...items) => process.platform == 'darwin' ? items : [];
 const non_mac  = (...items) => process.platform != 'darwin' ? items : [];
