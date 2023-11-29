@@ -13,3 +13,5 @@ contextBridge.exposeInMainWorld('pdpfs', {
     save:                  ()           => ipcRenderer.invoke('pdpfs:save'),
     set_selected:          (selected)   => ipcRenderer.send('app:set_selected', selected),
 })
+
+ipcRenderer.on('pdpfs', (e, type, detail) => window.dispatchEvent(new CustomEvent(type, { detail:detail })))

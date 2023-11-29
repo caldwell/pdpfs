@@ -22,6 +22,10 @@ const create_fs_window = (title, data) => {
 
     data.window = win;
     data.win_id = win.id;
+    data.send = (type, detail) => {
+        win.webContents.send('pdpfs', type, detail)
+    };
+
 
     windows[win.id] = data;
 
