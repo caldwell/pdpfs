@@ -65,7 +65,7 @@ function diskimageview({image_id}) {
     React.useEffect(() => {
         (async function() {
             try {
-                const entries = await pdpfs.get_directory_entries(image_id);
+                const entries = await pdpfs.get_directory_entries();
                 debugger;
                 console.log("setting entries", entries);
                 set_entries(entries);
@@ -82,12 +82,12 @@ function diskimageview({image_id}) {
         drop: (drop_obj, monitor) => {
             for (let file of drop_obj.files)
                 try {
-                    pdpfs.cp_into_image(image_id, file.path)
+                    pdpfs.cp_into_image(file.path)
                 } catch(e) {
                     set_error(e);
                     break;
                 }
-            (async () => { set_entries(await pdpfs.get_directory_entries(image_id)) })();
+            (async () => { set_entries(await pdpfs.get_directory_entries()) })();
             return { yo:"yo" }
         },
         collect: (monitor) => ({ hovering: monitor.isOver() }),
@@ -104,12 +104,12 @@ function diskimageview({image_id}) {
                 if (!hover_ref.current) return;
                 for (let path of event.payload.paths)
                     try {
-                        pdpfs.cp_into_image(image_id, path)
+                        pdpfs.cp_into_image(path)
                     } catch(e) {
                         set_error(e);
                         break;
                     }
-                set_entries(await pdpfs.get_directory_entries(image_id));
+                set_entries(await pdpfs.get_directory_entries());
             })
             return () => canceled = true;
         }, [image_id, set_entries]);
@@ -213,7 +213,7 @@ function diskimageview({image_id}) {
                                             },
                                             onDragStart: prevent_default((event) => {
                                                 if (mouse_state.current != "selecting")
-                                                    return pdpfs.start_drag(image_id, sorted.filter((e,i) => is_selected(i)).map(e => e.name))
+                                                    return pdpfs.start_drag(sorted.filter((e,i) => is_selected(i)).map(e => e.name))
                                                 return false;
                                             })
                                         },

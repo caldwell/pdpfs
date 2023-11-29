@@ -60,19 +60,19 @@ function open_image(image_path) {
 }
 
 const pdpfs_wrapper = (func) =>
-      async (event, id, ...args) => {
+      async (event, ...args) => {
           let win = BrowserWindow.fromWebContents(event.sender);
           let data = windows[win.id];
-          let ret = await func(id, args, data, event);
+          let ret = await func(data.image.id, args, data, event);
           return ret;
       };
 
-ipcMain.handle('pdpfs:get_directory_entries', async (event, ...args) => pdpfs.get_directory_entries(...args));
-ipcMain.handle('pdpfs:cp_into_image',         async (event, ...args) => pdpfs.cp_into_image        (...args));
-ipcMain.handle('pdpfs:image_is_dirty',        async (event, ...args) => pdpfs.image_is_dirty       (...args));
-ipcMain.handle('pdpfs:mv',                    async (event, ...args) => pdpfs.mv                   (...args));
-ipcMain.handle('pdpfs:rm',                    async (event, ...args) => pdpfs.rm                   (...args));
-ipcMain.handle('pdpfs:save',                  async (event, ...args) => pdpfs.save                 (...args));
+ipcMain.handle('pdpfs:get_directory_entries', pdpfs_wrapper((id, args) => pdpfs.get_directory_entries(id, ...args)));
+ipcMain.handle('pdpfs:cp_into_image',         pdpfs_wrapper((id, args) => pdpfs.cp_into_image        (id, ...args)));
+ipcMain.handle('pdpfs:image_is_dirty',        pdpfs_wrapper((id, args) => pdpfs.image_is_dirty       (id, ...args)));
+ipcMain.handle('pdpfs:mv',                    pdpfs_wrapper((id, args) => pdpfs.mv                   (id, ...args)));
+ipcMain.handle('pdpfs:rm',                    pdpfs_wrapper((id, args) => pdpfs.rm                   (id, ...args)));
+ipcMain.handle('pdpfs:save',                  pdpfs_wrapper((id, args) => pdpfs.save                 (id, ...args)));
 
 ipcMain.on('ondragstart', pdpfs_wrapper((image_id, [filenames], data, event) => {
     console.log(`dragging [${image_id}] ${data.temp_path}/{${filenames.join(',')}}...`);
