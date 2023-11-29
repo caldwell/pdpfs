@@ -1,6 +1,6 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const pdpfs = require(__dirname);
@@ -85,10 +85,97 @@ ipcMain.on('ondragstart', pdpfs_wrapper((image_id, [filenames], data, event) => 
     })
 }))
 
+const curr_win = () => BrowserWindow.getFocusedWindow();
+const curr_win_data = () => {
+    const win_id = curr_win()?.id;
+    return win_id == undefined ? undefined : windows[win_id]
+}
+const with_curr_data = (func) => {
+    let data = curr_win_data();
+    if (data) func(data);
+}
+
 app.on('open-file', (event, path) => {
     event.preventDefault();
     open_image(path);
 })
+
+app.on('menu:file/open', (event) => {
+    open_image_dialog();
+})
+
+app.on('menu:file/save', async (event) => {
+    with_curr_data(async ({window, image}) => {
+        await pdpfs.save(image.id, image.path);
+        window.setDocumentEdited(await pdpfs.image_is_dirty(image.id));
+    })
+})
+
+const shortcut = (key)      => process.platform == 'darwin' ? `Cmd+${key}` : `Ctrl+${key}`;
+const mac      = (...items) => process.platform == 'darwin' ? items : [];
+const non_mac  = (...items) => process.platform != 'darwin' ? items : [];
+const emitter  = (name) => (event) => app.emit(name, event);
+
+const __need = {};
+const extract_needs = (template) => {
+    let id = 0;
+    return template.map((toplevel) => {
+        if (toplevel.submenu != undefined)
+            toplevel.submenu = toplevel.submenu.map((m) => {
+                if (m.need) {
+                    if (!m.id)
+                        m.id = `need_${m.need.join('_')}:${id++}`;
+                    for (let n of m.need) {
+                        __need[n] ??= [];
+                        __need[n].push(m.id);
+                    }
+                }
+                return m;
+            });
+        return toplevel;
+    });
+}
+
+const enable_menu_items = (need, enable) => {
+    for (let id of __need[need]) {
+        let menu = Menu.getApplicationMenu().getMenuItemById(id);
+        menu.enabled = enable;
+    }
+}
+
+const menu = new Menu.buildFromTemplate(
+    extract_needs([
+        ...mac({ role: 'appMenu' }),
+        { label: 'File',
+          submenu: [
+              { beforeGroupContaining: ['Quit'],
+                label: 'New Disk Image…',     click: emitter('menu:file/new'),                   accelerator: shortcut('N') },
+              { label: 'Open Disk Image…',    click: emitter('menu:file/open'),                  accelerator: shortcut('O') },
+              { role: 'recentDocuments' },
+              { type: 'separator' },
+              { role: 'close',                click: emitter('menu:file/close'),   need:["win"] },
+              { label: 'Save Disk Image',     click: emitter('menu:file/save'),    need:["win"], accelerator: shortcut('S') },
+              { label: 'Save Disk Image As…', click: emitter('menu:file/save-as'), need:["win"] },
+              { type: 'separator' },
+              { label: 'Export Files…',       click: emitter('menu:file/export'),  need:["sel"] },
+              { label: 'Import Files…',       click: emitter('menu:file/import'),  need:["win"] },
+              { label: 'Delete Files',        click: emitter('menu:file/delete'),  need:["sel"] },
+              { label: 'Rename',              click: emitter('menu:file/rename'),  need:["one_sel"] },
+              ...non_mac({ type: 'separator' },
+                         { role: 'quit' }),
+          ],
+        },
+        { role: 'editMenu' },
+        { role: 'viewMenu' },
+        { role: 'windowMenu' },
+        { role: 'help',
+          submenu: [
+              { label: 'There is no help for you' }
+          ]
+        },
+    ])
+);
+Menu.setApplicationMenu(menu);
 
 app.whenReady().then(() => {
     open_image_dialog();
