@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('pdpfs', {
     mv:                    (src, dest)  => ipcRenderer.invoke('pdpfs:mv', src, dest),
     rm:                    (filename)   => ipcRenderer.invoke('pdpfs:rm', filename),
     save:                  ()           => ipcRenderer.invoke('pdpfs:save'),
+    set_selected:          (selected)   => ipcRenderer.send('app:set_selected', selected),
 })

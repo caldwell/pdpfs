@@ -51,6 +51,7 @@ function open_image(image_path) {
     let data = {
         image: { id: id,
                  path: image_path },
+        selected: [],
     };
     images[id] = data;
 
@@ -84,6 +85,15 @@ ipcMain.on('ondragstart', pdpfs_wrapper((image_id, [filenames], data, event) => 
         icon: path.join(__dirname, filenames.length == 1 ? 'web/stack-96.png' : 'web/stack-96.png'),
     })
 }))
+
+ipcMain.on('app:set_selected', pdpfs_wrapper((image_id, [selected]) => {
+    update_menus(images[image_id].selected = selected);
+}))
+
+const update_menus = (selected) => {
+    enable_menu_items("sel", selected.length > 0);
+    enable_menu_items("one_sel", selected.length == 1);
+}
 
 const curr_win = () => BrowserWindow.getFocusedWindow();
 const curr_win_data = () => {

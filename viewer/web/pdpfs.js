@@ -115,7 +115,22 @@ function diskimageview({image_id}) {
         }, [image_id, set_entries]);
     }
 
-    const [selection, set_selection] = React.useState([]);
+    let sorted = [...entries].sort((a,b) => a.name > b.name ? 1 : a.name == b.name ? 0 : -1);
+
+    const [selection, _set_selection] = React.useState([]);
+    function set_selection(f_or_new) {
+        if (typeof f_or_new == 'function')
+            return _set_selection(current => {
+                let new_selection = f_or_new(current);
+                pdpfs.set_selected(sorted.filter((e,i) => find_span(new_selection, i) != undefined).map((e) => e.name));
+                return new_selection;
+            })
+        else {
+            pdpfs.set_selected(sorted.filter((e,i) => find_span(f_or_new, i) != undefined).map((e) => e.name));
+            return _set_selection(f_or_new);
+        }
+    }
+
     function find_span(selection, i) {
         let sel = selection.findIndex(span => span.start <= i && i <= span.end);
         return sel == -1 ? undefined : sel;
@@ -170,8 +185,6 @@ function diskimageview({image_id}) {
     }
 
     const mouse_state = React.useRef(false);
-
-    let sorted = [...entries].sort((a,b) => a.name > b.name ? 1 : a.name == b.name ? 0 : -1);
 
     return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
                 ['div', { className: 'header' },
