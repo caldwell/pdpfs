@@ -18,6 +18,8 @@ const create_fs_window = (title, data) => {
         title: title,
     })
 
+    win.setRepresentedFilename(data.image.path);
+
     data.window = win;
     data.win_id = win.id;
 
@@ -64,6 +66,7 @@ const pdpfs_wrapper = (func) =>
           let win = BrowserWindow.fromWebContents(event.sender);
           let data = windows[win.id];
           let ret = await func(data.image.id, args, data, event);
+          win.setDocumentEdited(await pdpfs.image_is_dirty(data.image.id));
           return ret;
       };
 
