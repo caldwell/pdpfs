@@ -5,9 +5,10 @@ const path = require('node:path');
 const fs = require('node:fs');
 const pdpfs = require(__dirname);
 
-const temp_path = {};
+const windows = {};
+const images = {};
 
-const create_fs_window = (title, id) => {
+const create_fs_window = (title, data) => {
     const win = new BrowserWindow({
         width: 800,
         height: 600,
@@ -17,7 +18,20 @@ const create_fs_window = (title, id) => {
         title: title,
     })
 
-    win.loadFile('web/index.html', { query: { id: id } })
+    data.window = win;
+    data.win_id = win.id;
+
+    windows[win.id] = data;
+
+    win.loadFile('web/index.html', { query: { id: data.image.id } })
+
+    win.on('closed', (event) => {
+        if (data.temp_path) {
+            // cleanup
+        }
+        delete images[data.image.id];
+        delete windows[data.win_id];
+    });
 }
 
 async function open_image_dialog() {
@@ -32,12 +46,26 @@ async function open_image_dialog() {
 function open_image(image_path) {
     const id = pdpfs.open_image(image_path);
 
-    // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
-    temp_path[id] = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
-    pdpfs.extract_to_path(id, temp_path[id]);
+    let data = {
+        image: { id: id,
+                 path: image_path },
+    };
+    images[id] = data;
 
-    create_fs_window(`${pdpfs.filesystem_name(id)}: ${image_path}`, id);
+    // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
+    data.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
+    pdpfs.extract_to_path(id, data.temp_path);
+
+    create_fs_window(`${pdpfs.filesystem_name(id)}: ${image_path}`, data);
 }
+
+const pdpfs_wrapper = (func) =>
+      async (event, id, ...args) => {
+          let win = BrowserWindow.fromWebContents(event.sender);
+          let data = windows[win.id];
+          let ret = await func(id, args, data, event);
+          return ret;
+      };
 
 ipcMain.handle('pdpfs:get_directory_entries', async (event, ...args) => pdpfs.get_directory_entries(...args));
 ipcMain.handle('pdpfs:cp_into_image',         async (event, ...args) => pdpfs.cp_into_image        (...args));
@@ -46,13 +74,13 @@ ipcMain.handle('pdpfs:mv',                    async (event, ...args) => pdpfs.mv
 ipcMain.handle('pdpfs:rm',                    async (event, ...args) => pdpfs.rm                   (...args));
 ipcMain.handle('pdpfs:save',                  async (event, ...args) => pdpfs.save                 (...args));
 
-ipcMain.on('ondragstart', (event, image_id, filenames) => {
-    console.log(`dragging [${image_id}] ${temp_path[image_id]}/{${filenames.join(',')}}...`);
+ipcMain.on('ondragstart', pdpfs_wrapper((image_id, [filenames], data, event) => {
+    console.log(`dragging [${image_id}] ${data.temp_path}/{${filenames.join(',')}}...`);
     event.sender.startDrag({
-        files: filenames.map(f => path.join(temp_path[image_id], f)),
+        files: filenames.map(f => path.join(data.temp_path, f)),
         icon: path.join(__dirname, filenames.length == 1 ? 'web/stack-96.png' : 'web/stack-96.png'),
     })
-})
+}))
 
 app.on('open-file', (event, path) => {
     event.preventDefault();
