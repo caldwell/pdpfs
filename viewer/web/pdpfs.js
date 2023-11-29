@@ -116,12 +116,6 @@ function diskimageview({image_id}) {
     }
 
     const [selection, set_selection] = React.useState([]);
-    const manip_select = (index, f) => set_selection(current => ({ last_index: index ?? current.index,
-                                                                   selected: (cursel => {
-                                                                       let newsel=[...cursel];
-                                                                       f(newsel, current.last_index);
-                                                                       return newsel;
-                                                                   })(current.selected) }));
     function find_span(selection, i) {
         let sel = selection.findIndex(span => span.start <= i && i <= span.end);
         return sel == -1 ? undefined : sel;
