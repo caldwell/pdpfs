@@ -180,8 +180,7 @@ function diskimageview({image_id}) {
                                  }});
                 i--; // We deleted an entry so set ourselves back to compensate
             }
-        let r = sel.sort((a,b) => a.i - b.i).map(({span,i}) => span)
-        return r
+        return sel.sort((a,b) => a.i - b.i).map(({span,i}) => span)
     }
 
     const mouse_state = React.useRef(false);
