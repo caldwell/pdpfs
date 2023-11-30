@@ -5,11 +5,53 @@ const path = require('node:path');
 const fs = require('node:fs');
 const pdpfs = require(__dirname);
 
-const windows = {};
-const images = {};
+class Image {
+    static images = {};
 
-const create_fs_window = (title, data) => {
-    const win = new BrowserWindow({
+    path;
+    id;
+
+    constructor(image_path) {
+        this.path = image_path;
+        this.id = pdpfs.open_image(image_path);
+        Image.images[this.id] = this;
+    }
+
+    get_directory_entries()          { return pdpfs.get_directory_entries(this.id)            }
+    cp_into_image        (path)      { return pdpfs.cp_into_image        (this.id, path)      }
+    image_is_dirty       ()          { return pdpfs.image_is_dirty       (this.id)            }
+    mv                   (src, dest) { return pdpfs.mv                   (this.id, src, dest) }
+    rm                   (path)      { return pdpfs.rm                   (this.id, path)      }
+    save                 ()          { return pdpfs.save                 (this.id, this.path) }
+    extract_to_path      (path)      { return pdpfs.extract_to_path      (this.id, path)      }
+
+    close() {
+        delete Image.images[this.id];
+    }
+}
+
+class ImageWindow {
+    static windows = {};
+
+    static from_id(id) {
+        return this.windows[id]
+    }
+
+    path;
+    id;
+    window;
+    image;
+
+    constructor(image) {
+        this.image = image;
+        this.selected = [];
+        this.create_temp_path();
+        this.create_window(`${pdpfs.filesystem_name(this.image.id)}: ${this.image.path}`);
+
+    }
+
+    create_window(title) {
+      let win = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
@@ -18,26 +60,40 @@ const create_fs_window = (title, data) => {
         title: title,
     })
 
-    win.setRepresentedFilename(data.image.path);
+    win.setRepresentedFilename(this.image.path);
 
-    data.window = win;
-    data.win_id = win.id;
-    data.send = (type, detail) => {
-        win.webContents.send('pdpfs', type, detail)
+    this.window = win;
+
+
+    ImageWindow.windows[win.id] = this;
+
+    win.loadFile('web/index.html', { query: { id: this.image.id } })
+
+
+    let win_id = win.id;
+    win.on('closed', (event) => {
+        if (this.temp_path) {
+            // cleanup
+        }
+        this.image.close();
+        delete ImageWindow.windows[win_id];
+    });
+
+    win.on('focus', (event) => {
+        update_menus(this.selected)
+    });
+  }
+
+    send(type, detail) {
+        this.window.webContents.send('pdpfs', type, detail)
     };
 
 
-    windows[win.id] = data;
-
-    win.loadFile('web/index.html', { query: { id: data.image.id } })
-
-    win.on('closed', (event) => {
-        if (data.temp_path) {
-            // cleanup
-        }
-        delete images[data.image.id];
-        delete windows[data.win_id];
-    });
+  create_temp_path() {
+    // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
+    this.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
+    this.image.extract_to_path(this.temp_path);
+  }
 }
 
 async function open_image_dialog() {
@@ -50,48 +106,34 @@ async function open_image_dialog() {
 }
 
 function open_image(image_path) {
-    const id = pdpfs.open_image(image_path);
-
-    let data = {
-        image: { id: id,
-                 path: image_path },
-        selected: [],
-    };
-    images[id] = data;
-
-    // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
-    data.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
-    pdpfs.extract_to_path(id, data.temp_path);
-
-    create_fs_window(`${pdpfs.filesystem_name(id)}: ${image_path}`, data);
+    new ImageWindow(new Image(image_path));
 }
 
-const pdpfs_wrapper = (func) =>
+const with_image = (func) =>
       async (event, ...args) => {
           let win = BrowserWindow.fromWebContents(event.sender);
-          let data = windows[win.id];
-          let ret = await func(data.image.id, args, data, event);
-          win.setDocumentEdited(await pdpfs.image_is_dirty(data.image.id));
-          return ret;
+          let w = ImageWindow.from_id(win.id);
+          return await func(w.image, args, w, event) //data.image.id, args, data, event);
       };
 
-ipcMain.handle('pdpfs:get_directory_entries', pdpfs_wrapper((id, args) => pdpfs.get_directory_entries(id, ...args)));
-ipcMain.handle('pdpfs:cp_into_image',         pdpfs_wrapper((id, args) => pdpfs.cp_into_image        (id, ...args)));
-ipcMain.handle('pdpfs:image_is_dirty',        pdpfs_wrapper((id, args) => pdpfs.image_is_dirty       (id, ...args)));
-ipcMain.handle('pdpfs:mv',                    pdpfs_wrapper((id, args) => pdpfs.mv                   (id, ...args)));
-ipcMain.handle('pdpfs:rm',                    pdpfs_wrapper((id, args) => pdpfs.rm                   (id, ...args)));
-ipcMain.handle('pdpfs:save',                  pdpfs_wrapper((id, args) => pdpfs.save                 (id, ...args)));
+for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'mv', 'rm', 'save',]) {
+    ipcMain.handle(`pdpfs:${api}`, with_image(async (image, args, w) => {
+        let ret = image[api](...args);
+        w.window.setDocumentEdited(await image.image_is_dirty());
+        return ret;
+    }));
+}
 
-ipcMain.on('ondragstart', pdpfs_wrapper((image_id, [filenames], data, event) => {
-    console.log(`dragging [${image_id}] ${data.temp_path}/{${filenames.join(',')}}...`);
-    event.sender.startDrag({
-        files: filenames.map(f => path.join(data.temp_path, f)),
+ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
+    if (!filenames) filenames = w.selected;
+    w.window.webContents.startDrag({
+        files: filenames.map(f => path.join(w.temp_path, f)),
         icon: path.join(__dirname, filenames.length == 1 ? 'web/stack-96.png' : 'web/stack-96.png'),
     })
 }))
 
-ipcMain.on('app:set_selected', pdpfs_wrapper((image_id, [selected]) => {
-    update_menus(images[image_id].selected = selected);
+ipcMain.on('app:set_selected', with_image((image, [selected], w) => {
+    update_menus(w.selected = selected);
 }))
 
 const update_menus = (selected) => {
@@ -100,13 +142,13 @@ const update_menus = (selected) => {
 }
 
 const curr_win = () => BrowserWindow.getFocusedWindow();
-const curr_win_data = () => {
+const curr_window = () => {
     const win_id = curr_win()?.id;
-    return win_id == undefined ? undefined : windows[win_id]
+    return win_id == undefined ? undefined : ImageWindow.from_id(win_id)
 }
-const with_curr_data = (func) => {
-    let data = curr_win_data();
-    if (data) func(data);
+const with_curr_window = (func) => {
+    let w = curr_window();
+    if (w) func(w);
 }
 
 app.on('open-file', (event, path) => {
@@ -119,18 +161,18 @@ app.on('menu:file/open', (event) => {
 })
 
 app.on('menu:file/save', async (event) => {
-    with_curr_data(async ({window, image}) => {
-        await pdpfs.save(image.id, image.path);
-        window.setDocumentEdited(await pdpfs.image_is_dirty(image.id));
+    with_curr_window(async (w) => {
+        await w.image.save();
+        window.setDocumentEdited(await w.image.image_is_dirty());
     })
 })
 
 app.on('menu:file/delete', async (event) => {
-    with_curr_data(async ({window, image, selected, send}) => {
-        for (let file of selected)
-            await pdpfs.rm(image.id, file);
-        send('pdpfs:refresh-directory-entries', { entries: pdpfs.get_directory_entries(image.id) });
-        window.setDocumentEdited(await pdpfs.image_is_dirty(image.id));
+    with_curr_window(async (w) => {
+        for (let file of w.selected)
+            await w.image.rm(file);
+        w.send('pdpfs:refresh-directory-entries', { entries: w.image.get_directory_entries() });
+        window.setDocumentEdited(await w.image_is_dirty());
     })
 })
 
