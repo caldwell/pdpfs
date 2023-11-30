@@ -20,7 +20,7 @@ class Image {
     get_directory_entries()          { return pdpfs.get_directory_entries(this.id)            }
     cp_into_image        (path)      { return pdpfs.cp_into_image        (this.id, path)      }
     image_is_dirty       ()          { return pdpfs.image_is_dirty       (this.id)            }
-    mv                   (src, dest) { return pdpfs.mv                   (this.id, src, dest) }
+    mv                   (src, dest) { return pdpfs.mv                   (this.id, src, dest, false) }
     rm                   (path)      { return pdpfs.rm                   (this.id, path)      }
     save                 ()          { return pdpfs.save                 (this.id, this.path) }
     extract_to_path      (path)      { return pdpfs.extract_to_path      (this.id, path)      }
