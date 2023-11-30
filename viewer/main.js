@@ -47,7 +47,6 @@ class ImageWindow {
         this.selected = [];
         this.create_temp_path();
         this.create_window(`${pdpfs.filesystem_name(this.image.id)}: ${this.image.path}`);
-
     }
 
     create_window(title) {
@@ -59,34 +58,32 @@ class ImageWindow {
             },
             title: title,
         })
+        this.window = win;
+        ImageWindow.windows[win.id] = this;
 
         win.setRepresentedFilename(this.image.path);
 
-        this.window = win;
-
-
-        ImageWindow.windows[win.id] = this;
-
         win.loadFile('web/index.html', { query: { id: this.image.id } })
 
-        let win_id = win.id;
-        win.on('closed', (event) => {
-            if (this.temp_path) {
-                // cleanup
-            }
-            this.image.close();
-            delete ImageWindow.windows[win_id];
-        });
-
-        win.on('focus', (event) => {
-            update_menus(this.selected)
-        });
+        win.on('closed', (event) => this.closed(event))
+        win.on('focus', (event) => this.focus(event));
     }
 
     send(type, detail) {
         this.window.webContents.send('pdpfs', type, detail)
     };
 
+    closed(event) {
+        if (this.temp_path) {
+            // cleanup
+        }
+        this.image.close();
+        delete ImageWindow.windows[this.window.id];
+    }
+
+    focus(event) {
+        update_menus(this.selected)
+    }
 
     create_temp_path() {
         // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
