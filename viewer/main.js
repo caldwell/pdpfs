@@ -90,6 +90,10 @@ class ImageWindow {
         this.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
         this.image.extract_to_path(this.temp_path);
     }
+
+    async update_edited() {
+        this.window.setDocumentEdited(await this.image.image_is_dirty());
+    }
 }
 
 async function open_image_dialog() {
@@ -115,7 +119,7 @@ const with_image = (func) =>
 for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'mv', 'rm', 'save',]) {
     ipcMain.handle(`pdpfs:${api}`, with_image(async (image, args, w) => {
         let ret = image[api](...args);
-        w.window.setDocumentEdited(await image.image_is_dirty());
+        w.update_edited();
         return ret;
     }));
 }
@@ -159,7 +163,7 @@ app.on('menu:file/open', (event) => {
 app.on('menu:file/save', async (event) => {
     with_curr_window(async (w) => {
         await w.image.save();
-        window.setDocumentEdited(await w.image.image_is_dirty());
+        w.update_edited();
     })
 })
 
@@ -168,7 +172,7 @@ app.on('menu:file/delete', async (event) => {
         for (let file of w.selected)
             await w.image.rm(file);
         w.send('pdpfs:refresh-directory-entries', { entries: w.image.get_directory_entries() });
-        window.setDocumentEdited(await w.image_is_dirty());
+        w.update_edited();
     })
 })
 
