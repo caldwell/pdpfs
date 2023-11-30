@@ -109,8 +109,9 @@ body {
 }
 .directory-list {
     display: grid;
-    grid-template-areas: "f b s d"; /* needs to match `grid-column-end: span X`, below */
+    grid-template-areas: "i f b s d"; /* needs to match `grid-column-end: span X`, below */
     grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: min-content;
     height: 100vh;
     align-content: start;
 }
@@ -133,22 +134,22 @@ body {
 .header, .direntry, .body {
     display: grid;
     grid-template-columns: subgrid;
-    grid-column-end: span 4; /* needs to match `grid-template-areas:`, above */
+    grid-column-end: span 5; /* needs to match `grid-template-areas:`, above */
 }
 
 .direntry {
     margin: 0 8px;
 }
 
-.header .filename {
-    /* extra bit in front of filename to compensate for .header having 0 margin */
-    margin-left: 8px;
+.directory-list .icon {
+    grid-area: i;
+    padding-left: 1em;
 }
 
 .directory-list .filename {
     grid-area: f;
     color: var(--filename);
-    padding-left: 1em;
+    padding-left: .4rem;
 }
 
 .blocks {
