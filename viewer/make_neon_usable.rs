@@ -165,11 +165,11 @@ pub fn vec_to_array<'a, C: Context<'a>>(cx: &mut C, vec: &Vec<Handle<JsValue>>) 
     Ok(a)
 }
 
-pub trait ToJsResult<T: Debug, E: Debug+Display> {
+pub trait ToJsResult<T, E: Debug+Display> {
     fn into_jserr(self, cx: &mut FunctionContext) -> NeonResult<T>;
 }
 
-impl<T: Debug,E: Debug+Display+ToThrow> ToJsResult<T,E> for Result<T,E> {
+impl<T,E: Debug+Display+ToThrow> ToJsResult<T,E> for Result<T,E> {
     fn into_jserr(self, cx: &mut FunctionContext) -> NeonResult<T> {
         self.map_err(|e| e.into_throw(cx))
     }

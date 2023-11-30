@@ -57,7 +57,9 @@ fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
 
     let id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-    let fs = pdpfs::ops::open_fs(pdpfs::ops::open_device(&Path::new(&image_file)).expect("phys image bad")).expect("fs bad");
+    let fs = pdpfs::ops::open_fs(pdpfs::ops::open_device(&Path::new(&image_file))
+        .map_err(|e| format!("Bad or unknown disk image file format.\nDetails: {}", e)).into_jserr(&mut cx)?)
+        .map_err(|e| format!("Bad or unknown format on disk image.\nDetails: {}", e)).into_jserr(&mut cx)?;
 
     IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
 
