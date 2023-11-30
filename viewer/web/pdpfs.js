@@ -191,6 +191,7 @@ function diskimageview({image_id}) {
                  ['div', { className: 'blocks' }, "Block Count"],
                  ['div', { className: 'size' }, "File Size"],
                  ['div', { className: 'date' }, "Creation Date"]],
+                ['div', { className: 'body' },
                 ...sorted.map((e,i) => ['div', { draggable: true, className: `direntry ${is_selected(i) ? "selected" : ""}`},
                                         {
                                             onMouseDown: (event) => {
@@ -233,5 +234,5 @@ function diskimageview({image_id}) {
                                         ['div', { className: 'blocks' }, e.length],
                                         ['div', { className: 'size' }, e.length*512],
                                         ['div', { className: 'date' }, e.creation_date],
-                                       ])]);
+                                       ])]]);
 }

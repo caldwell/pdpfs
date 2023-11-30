@@ -91,6 +91,9 @@
     }
 }
 
+*, ::before, ::after {
+  box-sizing: border-box;
+}
 
 body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -98,6 +101,7 @@ body {
     font-size: 14px;
     background-color: var(--background);
     color: var(--filename);
+    margin: 0;
 }
 
 #pdpfs {
@@ -105,19 +109,42 @@ body {
 }
 .directory-list {
     display: grid;
-    grid-template-areas: "f b s d";
-    border: 2px solid var(--background);
-}
-.directory-list.hover {
-    border-color: var(--drop-outline);
+    grid-template-areas: "f b s d"; /* needs to match `grid-column-end: span X`, below */
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100vh;
+    align-content: start;
 }
 
-.header, .direntry {
-    grid-row: auto;
+.directory-list .body {
+    position: relative; /* so hover fills in nicely */
+    grid-auto-rows: min-content;
+    overflow-y: scroll;
+}
+.directory-list.hover .body::before {
+    content: " ";
+    position: absolute;
+    border: 2px solid var(--drop-outline);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.header, .direntry, .body {
     display: grid;
     grid-template-columns: subgrid;
-    grid-column-end: span 4;
+    grid-column-end: span 4; /* needs to match `grid-template-areas:`, above */
 }
+
+.direntry {
+    margin: 0 8px;
+}
+
+.header .filename {
+    /* extra bit in front of filename to compensate for .header having 0 margin */
+    margin-left: 8px;
+}
+
 .directory-list .filename {
     grid-area: f;
     color: var(--filename);
@@ -137,15 +164,19 @@ body {
     color: var(--boring);
 }
 .header {
+    position: sticky;
+    top: 0px;
+    background: var(--background);
     border-bottom: 1px solid var(--separator);
+    margin: 0; /* So the border line goes all the way to the left and right edges */
 }
 .directory-list div {
-    padding: .1rem;
+    padding: .1rem 0;
 }
 .directory-list .direntry {
     border-radius: 7px;
 }
-.directory-list .direntry:nth-child(2n+1) {
+.directory-list .direntry:nth-child(2n) {
     background-color: var(--zebra);
 }
 .directory-list .direntry.selected {
@@ -160,4 +191,9 @@ body {
 .direntry.selected:has(+ .direntry.selected) {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+}
+
+.directory-list .body {
+  grid-auto-rows: min-content;
+  overflow-y: scroll;
 }
