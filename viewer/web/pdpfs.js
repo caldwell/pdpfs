@@ -130,6 +130,11 @@ function diskimageview({image_id}) {
             console.log(e);
         }
     };
+    React.useEffect(() => {
+        let handler = (event) => set_editing(event.detail);
+        window.addEventListener("pdpfs:rename", handler);
+        return () => { window.removeEventListener("pdpfs:rename", handler) };
+    }, [set_editing]);
 
     return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
                 ['div', { className: 'header' },

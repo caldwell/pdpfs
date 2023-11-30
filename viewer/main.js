@@ -225,6 +225,13 @@ app.on('menu:file/delete', async (event) => {
     })
 })
 
+app.on('menu:file/rename', async (event) => {
+    with_curr_window(async (w) => {
+        if (w.selected.length != 1) return; // Error?
+        w.send('pdpfs:rename', w.selected[0]);
+    })
+})
+
 const shortcut = (key)      => process.platform == 'darwin' ? `Cmd+${key}` : `Ctrl+${key}`;
 const mac      = (...items) => process.platform == 'darwin' ? items : [];
 const non_mac  = (...items) => process.platform != 'darwin' ? items : [];
