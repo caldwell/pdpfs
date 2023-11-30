@@ -65,6 +65,7 @@ class ImageWindow {
 
         win.loadFile('web/index.html', { query: { id: this.image.id } })
 
+        win.on('close', (event) => this.close(event));
         win.on('closed', (event) => this.closed(event))
         win.on('focus', (event) => this.focus(event));
     }
@@ -72,6 +73,28 @@ class ImageWindow {
     send(type, detail) {
         this.window.webContents.send('pdpfs', type, detail)
     };
+
+    async close(event) {
+        if (!await pdpfs.image_is_dirty(this.image.id))
+            return;
+        event.preventDefault();
+
+        let { response } = await dialog.showMessageBox(this.window, {
+            message: `${path.basename(this.image.path)} has unsaved changes.`,
+            type: "question",
+            buttons: ["&Cancel", "&Discard Changes", "&Save Changes"],
+            defaultId: 2,
+            normalizeAccessKeys: true,
+        });
+
+        // We already prevented default so Cancel is handled.
+        if (response == 1) // Discard
+            this.window.destroy();
+        if (response == 2) { // Save
+            this.image.save();
+            this.window.close();
+        }
+    }
 
     closed(event) {
         if (this.temp_path) {
