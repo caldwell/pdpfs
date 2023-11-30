@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('pdpfs', {
     start_drag:            (file_names) => ipcRenderer.send('ondragstart', file_names),
     image_is_dirty:        ()           => ipcRenderer.invoke('pdpfs:image_is_dirty'),
     mv:                    (src, dest)  => ipcRenderer.invoke('pdpfs:mv', src, dest),
-    rm:                    (filename)   => ipcRenderer.invoke('pdpfs:rm', filename),
+    rm:                    (...files)   => ipcRenderer.invoke('pdpfs:rm', ...files),
     save:                  ()           => ipcRenderer.invoke('pdpfs:save'),
     set_selected:          (selected)   => ipcRenderer.send('app:set_selected', selected),
 })

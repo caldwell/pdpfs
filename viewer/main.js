@@ -104,6 +104,17 @@ class ImageWindow {
         this.update_edited();
         this.update_entries();
     }
+
+    async rm_selected() {
+        await this.rm(...this.selected)
+    }
+
+    async rm(...files) {
+        for (let file of files)
+            await this.image.rm(file);
+        this.update_entries();
+        this.update_edited();
+    }
 }
 
 async function open_image_dialog() {
@@ -126,7 +137,7 @@ const with_image = (func) =>
           return await func(w.image, args, w, event) //data.image.id, args, data, event);
       };
 
-for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'rm', 'save',]) {
+for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'save',]) {
     ipcMain.handle(`pdpfs:${api}`, with_image(async (image, args, w) => {
         let ret = image[api](...args);
         w.update_edited();
@@ -134,6 +145,7 @@ for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'rm
     }));
 }
 
+ipcMain.handle('pdpfs:rm', with_image((image, files, w) => w.rm(...files)))
 ipcMain.handle('pdpfs:mv', with_image((image, [src, dest], w) => w.mv(src, dest)))
 
 ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
@@ -181,10 +193,7 @@ app.on('menu:file/save', async (event) => {
 
 app.on('menu:file/delete', async (event) => {
     with_curr_window(async (w) => {
-        for (let file of w.selected)
-            await w.image.rm(file);
-        w.send('pdpfs:refresh-directory-entries', { entries: w.image.get_directory_entries() });
-        w.update_edited();
+        w.rm_selected()
     })
 })
 
