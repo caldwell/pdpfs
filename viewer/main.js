@@ -127,7 +127,12 @@ async function open_image_dialog() {
 }
 
 function open_image(image_path) {
-    new ImageWindow(new Image(image_path));
+    try {
+        new ImageWindow(new Image(image_path));
+    } catch(e) {
+        dialog.showErrorBox(`Unable to open ${path.basename(image_path)}`,
+                            `There was an error loading the image: ${e}`);
+    }
 }
 
 const with_image = (func) =>
