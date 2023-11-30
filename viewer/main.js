@@ -245,7 +245,7 @@ const menu = new Menu.buildFromTemplate(
               { type: 'separator' },
               { label: 'Export Files…',       click: emitter('menu:file/export'),  need:["sel"] },
               { label: 'Import Files…',       click: emitter('menu:file/import'),  need:["win"] },
-              { label: 'Delete Files',        click: emitter('menu:file/delete'),  need:["sel"] },
+              { label: 'Delete',              click: emitter('menu:file/delete'),  need:["sel"], accelerator: shortcut('Backspace')},
               { label: 'Rename',              click: emitter('menu:file/rename'),  need:["one_sel"] },
               ...non_mac({ type: 'separator' },
                          { role: 'quit' }),
