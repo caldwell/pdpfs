@@ -51,49 +51,48 @@ class ImageWindow {
     }
 
     create_window(title) {
-      let win = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js')
-        },
-        title: title,
-    })
+        let win = new BrowserWindow({
+            width: 800,
+            height: 600,
+            webPreferences: {
+                preload: path.join(__dirname, 'preload.js')
+            },
+            title: title,
+        })
 
-    win.setRepresentedFilename(this.image.path);
+        win.setRepresentedFilename(this.image.path);
 
-    this.window = win;
-
-
-    ImageWindow.windows[win.id] = this;
-
-    win.loadFile('web/index.html', { query: { id: this.image.id } })
+        this.window = win;
 
 
-    let win_id = win.id;
-    win.on('closed', (event) => {
-        if (this.temp_path) {
-            // cleanup
-        }
-        this.image.close();
-        delete ImageWindow.windows[win_id];
-    });
+        ImageWindow.windows[win.id] = this;
 
-    win.on('focus', (event) => {
-        update_menus(this.selected)
-    });
-  }
+        win.loadFile('web/index.html', { query: { id: this.image.id } })
+
+        let win_id = win.id;
+        win.on('closed', (event) => {
+            if (this.temp_path) {
+                // cleanup
+            }
+            this.image.close();
+            delete ImageWindow.windows[win_id];
+        });
+
+        win.on('focus', (event) => {
+            update_menus(this.selected)
+        });
+    }
 
     send(type, detail) {
         this.window.webContents.send('pdpfs', type, detail)
     };
 
 
-  create_temp_path() {
-    // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
-    this.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
-    this.image.extract_to_path(this.temp_path);
-  }
+    create_temp_path() {
+        // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
+        this.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
+        this.image.extract_to_path(this.temp_path);
+    }
 }
 
 async function open_image_dialog() {
