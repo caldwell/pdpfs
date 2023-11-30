@@ -94,6 +94,16 @@ class ImageWindow {
     async update_edited() {
         this.window.setDocumentEdited(await this.image.image_is_dirty());
     }
+
+    async update_entries() {
+        this.send('pdpfs:refresh-directory-entries', { entries: this.image.get_directory_entries() });
+    }
+
+    mv(src, dest) {
+        this.image.mv(src, dest);
+        this.update_edited();
+        this.update_entries();
+    }
 }
 
 async function open_image_dialog() {
@@ -116,13 +126,15 @@ const with_image = (func) =>
           return await func(w.image, args, w, event) //data.image.id, args, data, event);
       };
 
-for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'mv', 'rm', 'save',]) {
+for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'rm', 'save',]) {
     ipcMain.handle(`pdpfs:${api}`, with_image(async (image, args, w) => {
         let ret = image[api](...args);
         w.update_edited();
         return ret;
     }));
 }
+
+ipcMain.handle('pdpfs:mv', with_image((image, [src, dest], w) => w.mv(src, dest)))
 
 ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
     if (!filenames) filenames = w.selected;

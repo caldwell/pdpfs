@@ -119,6 +119,18 @@ function diskimageview({image_id}) {
 
     let sorted = [...entries].sort((a,b) => a.name > b.name ? 1 : a.name == b.name ? 0 : -1);
 
+    const [editing, set_editing] = React.useState(null);
+    const rename = async (src, dest) => {
+        try {
+            if (src != dest)
+                await pdpfs.mv(src, dest);
+            set_editing(null);
+        } catch(e) {
+            // Maybe a tooltip??
+            console.log(e);
+        }
+    };
+
     return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
                 ['div', { className: 'header' },
                  ['div', { className: 'filename' }, "Filename"],
@@ -132,7 +144,21 @@ function diskimageview({image_id}) {
                                                                return pdpfs.start_drag()
                                                            })},
                                                            ['div', { className: 'icon' }, [svg, { icon: "file" }]],
-                                                           ['div', { className: 'filename' }, e.name],
+                                                           ['div', { className: 'filename' },
+                                                            editing != e.name ? ['span', e.name,
+                                                                                 { onClick: () => { set_editing(e.name) } }]
+                                                                              : ['input', { type: "text", size: 12, defaultValue: e.name, autoFocus: true },
+                                                                                 { onFocus: (event) => event.target.select(),
+                                                                                   onBlur: (event) => { rename(e.name, event.target.value) },
+                                                                                   onKeyDown: (event) => { console.log("keydown", event);
+                                                                                                           if (event.key == "Escape") {
+                                                                                                               set_editing(null);
+                                                                                                               return false;
+                                                                                                           }
+                                                                                                           if (event.key == "Return" || event.key == "Enter")
+                                                                                                               rename(e.name, event.target.value);
+                                                                                                         },
+                                                                                 }]],
                                                            ['div', { className: 'blocks' }, e.length],
                                                            ['div', { className: 'size' }, e.length*512],
                                                            ['div', { className: 'date' }, e.creation_date]]
