@@ -62,6 +62,8 @@ function diskimageview({image_id}) {
     const [entries, set_entries] = React.useState([]);
     const [error, set_error] = React.useState(null);
 
+    let { selected_values, make_selectable, clear_selection } = useSelection(new_selection => pdpfs.set_selected(new_selection));
+
     React.useEffect(() => {
         let cancelled;
         pdpfs.get_directory_entries()
@@ -69,7 +71,7 @@ function diskimageview({image_id}) {
             .catch((err) => set_error(err));
         let handler = (event) => {
             set_entries(event.detail.entries);
-            set_selection([]); // A bit broad, but safe. Otherwise we need to correlate by name which we don't do.
+            clear_selection(); // A bit broad, but safe. Otherwise we need to correlate by name which we don't do.
         };
         window.addEventListener("pdpfs:refresh-directory-entries", handler);
         return () => { cancelled=true; window.removeEventListener("pdpfs:refresh-directory-entries", handler) };
@@ -117,18 +119,39 @@ function diskimageview({image_id}) {
 
     let sorted = [...entries].sort((a,b) => a.name > b.name ? 1 : a.name == b.name ? 0 : -1);
 
+    return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
+                ['div', { className: 'header' },
+                 ['div', { className: 'filename' }, "Filename"],
+                 ['div', { className: 'blocks' }, "Block Count"],
+                 ['div', { className: 'size' }, "File Size"],
+                 ['div', { className: 'date' }, "Creation Date"]],
+                ['div', { className: 'body' },
+                 make_selectable(sorted.map((e) => ({ value: e.name,
+                                                      el: ['div', { draggable: true, className: `direntry` },
+                                                           { onDragStart: prevent_default((event) => {
+                                                               return pdpfs.start_drag()
+                                                           })},
+                                                           ['div', { className: 'icon' }, [svg, { icon: "file" }]],
+                                                           ['div', { className: 'filename' }, e.name],
+                                                           ['div', { className: 'blocks' }, e.length],
+                                                           ['div', { className: 'size' }, e.length*512],
+                                                           ['div', { className: 'date' }, e.creation_date]]
+                                                    })))]]);
+}
+
+function useSelection(on_change) {
+    let values;
+    function selected_values() {
+        return values.filter((v, i) => is_selected(v))
+    }
+
     const [selection, _set_selection] = React.useState([]);
-    function set_selection(f_or_new) {
-        if (typeof f_or_new == 'function')
-            return _set_selection(current => {
-                let new_selection = f_or_new(current);
-                pdpfs.set_selected(sorted.filter((e,i) => find_span(new_selection, i) != undefined).map((e) => e.name));
-                return new_selection;
-            })
-        else {
-            pdpfs.set_selected(sorted.filter((e,i) => find_span(f_or_new, i) != undefined).map((e) => e.name));
-            return _set_selection(f_or_new);
-        }
+    function set_selection(f) {
+        return _set_selection(current => {
+            let new_selection = f(current);
+            on_change(values.filter((v,i) => find_span(new_selection, i) != undefined));
+            return new_selection;
+        })
     }
 
     function find_span(selection, i) {
@@ -185,15 +208,22 @@ function diskimageview({image_id}) {
 
     const mouse_state = React.useRef(false);
 
-    return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
-                ['div', { className: 'header' },
-                 ['div', { className: 'filename' }, "Filename"],
-                 ['div', { className: 'blocks' }, "Block Count"],
-                 ['div', { className: 'size' }, "File Size"],
-                 ['div', { className: 'date' }, "Creation Date"]],
-                ['div', { className: 'body' },
-                ...sorted.map((e,i) => ['div', { draggable: true, className: `direntry ${is_selected(i) ? "selected" : ""}`},
-                                        {
+    return {
+        selected_values: () => values.filter((v, i) => is_selected(v)),
+        clear_selection: () => set_selection(current => []),
+        make_selectable: (items) => {
+            values = items.map((item) => item.value);
+            let els = items.map((item) => item.el);
+            return jsr([React.Fragment,
+                        ...els.map((el,i) => {
+                            let cno = el.find(v => typeof(v) == 'object' && v.className);
+                            if (cno && is_selected(i)) cno.className += " selected";
+                            let odso = el.find(v => typeof(v) == 'object' && v.onDragStart);
+                            if (odso && is_selected(i)) {
+                                let old_on_drag_start = odso.onDragStart;
+                                odso.onDragStart = (event) => { if (mouse_state.current != "selecting") old_on_drag_start(event) }
+                            }
+                            return ([ ...el, {
                                             onMouseDown: (event) => {
                                                 if (event.altKey || event.metaKey) {
                                                     toggle_selected(i);
@@ -205,7 +235,7 @@ function diskimageview({image_id}) {
                                                     if (is_selected(i))
                                                         mouse_state.current = "clicked-on-selection";
                                                     else {
-                                                        set_selection([{ start: i, end: i, anchor: i }]);
+                                                        set_selection(current => [{ start: i, end: i, anchor: i }]);
                                                         mouse_state.current = "selecting"
                                                     };
                                                 }
@@ -220,22 +250,14 @@ function diskimageview({image_id}) {
                                             },
                                             onMouseUp: (event) => {
                                                 if (mouse_state.current == "clicked-on-selection") {
-                                                    set_selection([{ start: i, end: i, anchor: i }]);
+                                                    set_selection(current => [{ start: i, end: i, anchor: i }]);
                                                 }
                                                 mouse_state.current = undefined
                                             },
-                                            onDragStart: prevent_default((event) => {
-                                                if (mouse_state.current != "selecting")
-                                                    return pdpfs.start_drag(sorted.filter((e,i) => is_selected(i)).map(e => e.name))
-                                                return false;
-                                            })
-                                        },
-                                        ['div', { className: 'icon' }, [svg, { icon: "file" }]],
-                                        ['div', { className: 'filename' }, e.name],
-                                        ['div', { className: 'blocks' }, e.length],
-                                        ['div', { className: 'size' }, e.length*512],
-                                        ['div', { className: 'date' }, e.creation_date],
-                                       ])]]);
+                            }])
+                        })])
+        }
+    }
 }
 
 function svg({icon}) {
