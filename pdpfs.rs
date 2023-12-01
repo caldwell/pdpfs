@@ -12,10 +12,12 @@ use ops::*;
 use anyhow::anyhow;
 use docopt::Docopt;
 use serde::Deserialize;
+use strum::VariantNames;
 
 use crate::fs::FileSystem;
 
-const USAGE: &'static str = r#"
+fn usage() -> String {
+    format!(r#"
 Usage:
   pdpfs -h
   pdpfs [-h] -i <image> ls [-l] [-a]
@@ -79,15 +81,19 @@ Options:
    Initializes a new image. The <image> file specified by `-i` will be created
    and must _not_ already exist.
 
-   <device-type> must be: rx01
+   <device-type> must be one of: {}
 
-   <filesystem> must be one of: rt11, xxdp
+   <filesystem> must be one of: {}
 
  convert:
    Convert the image to a different image file type.
 
-   <image-type> must be one of: img, imd
-"#;
+   <image-type> must be one of: {}
+"#,
+    DeviceType::VARIANTS.join(", "),
+    FileSystemType::VARIANTS.join(", "),
+    ImageType::VARIANTS.join(", "))
+}
 
 #[derive(Debug, Deserialize)]
 struct Args {
@@ -114,7 +120,7 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
-    let args: Args = Docopt::new(USAGE)
+    let args: Args = Docopt::new(usage())
         .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
 

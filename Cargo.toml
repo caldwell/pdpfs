@@ -24,3 +24,4 @@ docopt = "1"
 serde = "1"
 whoami = "1"
 join-string = "0.3.0"
+strum = { version = "0.25.0", features = ["derive"] }
