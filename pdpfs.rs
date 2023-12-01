@@ -90,7 +90,7 @@ Options:
 
    <image-type> must be one of: {}
 "#,
-    DeviceType::VARIANTS.join(", "),
+    DeviceType::VARIANTS.iter().map(|s| *s).filter(|t| *t != "flat").collect::<Vec<&str>>().join(", "),
     FileSystemType::VARIANTS.join(", "),
     ImageType::VARIANTS.join(", "))
 }
@@ -126,7 +126,8 @@ fn main() -> anyhow::Result<()> {
 
     // Do this very early since we normally die if the image file doesn't exist
     if args.cmd_mkfs {
-        return create_image(&args.flag_image, args.arg_device_type.unwrap(), args.arg_filesystem.unwrap());
+        let fs = create_image(ImageType::from_file_ext(&args.flag_image)?, args.arg_device_type.unwrap(), args.arg_filesystem.unwrap())?;
+        return save_image(fs.block_device().physical_device(), &args.flag_image);
     }
 
     let dev = open_device(&args.flag_image)?;

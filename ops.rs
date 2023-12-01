@@ -24,6 +24,7 @@ use strum::EnumVariantNames;
 #[strum(serialize_all = "lowercase")]
 pub enum DeviceType {
     RX01,
+    Flat(usize),
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames)]
@@ -32,6 +33,18 @@ pub enum DeviceType {
 pub enum ImageType {
     IMD,
     IMG,
+}
+
+impl ImageType {
+    pub fn from_file_ext(path: &Path) -> anyhow::Result<ImageType> {
+        let ext = path.extension().and_then(|oss| oss.to_str());
+        match ext {
+            Some("img") => Ok(ImageType::IMG),
+            Some("imd") => Ok(ImageType::IMD),
+            Some(ext) => Err(anyhow!("Unknown image type for extention {}", ext)),
+            None        => Err(anyhow!("Unknown image type for {}", path.display())),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames)]
@@ -194,23 +207,33 @@ pub fn mv(fs: &mut impl FileSystem, src: &Path, dest: &Path, overwrite_dest: boo
     fs.rename(&path_to_rt11_filename(src)?, &path_to_rt11_filename(dest)?)
 }
 
-pub fn create_image(image: &Path, dtype: DeviceType, fstype: FileSystemType) -> anyhow::Result<()> {
-    let ext = image.extension().and_then(|oss| oss.to_str());
-    match (dtype, ext) {
-        (DeviceType::RX01, Some("img")) => return mkfs(image, fstype, RX(IMG::from_raw(vec![0; 256256], RX01_GEOMETRY))),
-        (DeviceType::RX01, Some("imd")) => return mkfs(image, fstype, RX(IMD::from_raw(vec![0; 256256], RX01_GEOMETRY))),
-        (DeviceType::RX01, Some(ext)) => return Err(anyhow!("Unknown image type {}", ext)),
-        (DeviceType::RX01, None)      => return Err(anyhow!("Unknown image type for {}", image.to_string_lossy())),
-    }
-}
-
-pub fn mkfs<B: BlockDevice+ 'static>(path: &Path, fstype: FileSystemType, image: B) -> anyhow::Result<()> {
-    let fs: Box<dyn FileSystem<BlockDevice = B>> = match fstype {
-        FileSystemType::RT11 => Box::new(RT11FS::mkfs(image)?),
-        FileSystemType::XXDP => Box::new(XxdpFs::mkfs(image)?),
+pub fn create_image(imtype: ImageType, dtype: DeviceType, fstype: FileSystemType) -> anyhow::Result<Box<dyn FileSystem<BlockDevice = Box<dyn BlockDevice>>>> {
+    let (size, geometry) = match dtype {
+        DeviceType::RX01 => (256256, RX01_GEOMETRY),
+        DeviceType::Flat(size) => (size, Geometry {
+            cylinders: 1,
+            heads: 1,
+            sectors: size/512,
+            sector_size: 512,
+        }),
     };
-    save_image(fs.block_device().physical_device(), path)?;
-    Ok(())
+
+    fn create_device<'a, P: PhysicalBlockDevice + 'a>(dtype: DeviceType, phys: P) -> Box<dyn BlockDevice+'a> {
+        match dtype {
+            DeviceType::RX01    => Box::new(RX(phys)),
+            DeviceType::Flat(_) => Box::new(Flat(phys)),
+        }
+    }
+
+    let dev = match imtype {
+        ImageType::IMD => create_device(dtype, IMD::from_raw(vec![0; size], geometry)),
+        ImageType::IMG => create_device(dtype, IMG::from_raw(vec![0; size], geometry)),
+    };
+
+    Ok(match fstype {
+        FileSystemType::RT11 => Box::new(RT11FS::mkfs(dev)?) as Box<dyn FileSystem<BlockDevice = Box<dyn BlockDevice>>>,
+        FileSystemType::XXDP => Box::new(XxdpFs::mkfs(dev)?) as Box<dyn FileSystem<BlockDevice = Box<dyn BlockDevice>>>,
+    })
 }
 
 pub fn convert(image: &Box<dyn BlockDevice>, image_type: ImageType, dest: &Path) -> anyhow::Result<()> {
