@@ -17,9 +17,9 @@ pub const RX02_GEOMETRY: Geometry = Geometry {
 };
 
 #[derive(Clone)]
-pub struct RX<B: PhysicalBlockDevice + Clone>(pub B);
+pub struct RX<B: PhysicalBlockDevice>(pub B);
 
-impl<B: PhysicalBlockDevice + Clone> BlockDevice for RX<B> {
+impl<B: PhysicalBlockDevice> BlockDevice for RX<B> {
     fn read_sector(&self, sector: usize) -> anyhow::Result<Vec<u8>> {
         let (c,h,s) = self.physical_from_logical(sector);
         self.0.read_sector(c+1,h,s) // RT-11 skips track 0 on RX devices (for IBM interchange compatibility)
@@ -44,7 +44,7 @@ impl<B: PhysicalBlockDevice + Clone> BlockDevice for RX<B> {
     }
 }
 
-impl<B: PhysicalBlockDevice + Clone> RX<B> {
+impl<B: PhysicalBlockDevice> RX<B> {
     pub fn physical_from_logical(&self, sector: usize) -> (usize/*Cylinder*/, usize/*Head*/, usize/*Sector*/) {
         let g = self.0.geometry();
         // RT-11 interleaves floppy sectors in the RX-01 driver. (They are _not_ physically interleaved on the
