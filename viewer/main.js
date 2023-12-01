@@ -24,6 +24,9 @@ class Image {
     rm                   (path)      { return pdpfs.rm                   (this.id, path)      }
     save                 ()          { return pdpfs.save                 (this.id, this.path) }
     extract_to_path      (path)      { return pdpfs.extract_to_path      (this.id, path)      }
+    convert              (file,
+                          image_type){ return pdpfs.convert              (this.id, file, image_type) }
+
 
     close() {
         delete Image.images[this.id];
@@ -215,6 +218,28 @@ app.on('menu:file/open', (event) => {
 app.on('menu:file/save', async (event) => {
     with_curr_window(async (w) => {
         await w.image.save();
+        w.update_edited();
+    })
+})
+
+app.on('menu:file/save-as', async (event) => {
+    with_curr_window(async (w) => {
+        let { canceled, filePath, bookmark } = await dialog.showSaveDialog(w.window, {
+            title: "Save this disk image as:",
+            defaultPath: "Disk Image.img",
+            filters: [ { name: "IMG", extensions: [".img"] },
+                       { name: "IMD", extensions: [".imd"] },],
+            message: "Above the text fields we dream",
+            properties: ['createDirectory', 'showOverwriteConfirmation'],
+        });
+        if (canceled) return;
+        try {
+            await w.image.convert(filePath, path.extname(filePath).slice(1));
+        } catch(e) {
+            await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
+            return;
+        }
+        console.log(canceled, filePath, bookmark);
         w.update_edited();
     })
 })
