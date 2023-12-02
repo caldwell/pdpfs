@@ -17,6 +17,7 @@ use pdpfs::block::BlockDevice;
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("open_image", open_image)?;
+    cx.export_function("create_image", create_image)?;
     cx.export_function("image_is_dirty", image_is_dirty)?;
     cx.export_function("get_directory_entries", get_directory_entries)?;
     cx.export_function("extract_to_path", extract_to_path)?;
@@ -61,6 +62,24 @@ fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
         .map_err(|e| format!("Bad or unknown disk image file format.\nDetails: {}", e)).into_jserr(&mut cx)?)
         .map_err(|e| format!("Bad or unknown format on disk image.\nDetails: {}", e)).into_jserr(&mut cx)?;
 
+    IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
+
+    Ok(cx.number(id))
+}
+
+fn create_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
+    js_args!(&mut cx, image_type: pdpfs::ops::ImageType, device_type: Option<pdpfs::ops::DeviceType>, image_size: Option<u32>, filesystem: pdpfs::ops::FileSystemType);
+
+    let device_type = match (device_type, image_size) {
+        (Some(t),   None)    => t,
+        (None,      Some(n)) => pdpfs::ops::DeviceType::Flat(n as usize),
+        (None,      None)    => return cx.throw_error("create_image: One of device_type or image_size must be specified"),
+        (_,         _)       => return cx.throw_error("create_image: Cannot specify both device_type and image_size"),
+    };
+    let fs = pdpfs::ops::create_image(image_type, device_type, filesystem)
+        .map_err(|e| format!("Couldn't create the disk image.\nDetails: {}", e)).into_jserr(&mut cx)?;
+
+    let id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
 
     Ok(cx.number(id))
