@@ -105,9 +105,9 @@ body {
 }
 
 #pdpfs {
-    min-width: 30rem;
 }
 .directory-list {
+    min-width: 30rem;
     display: grid;
     grid-template-areas: "i f b s d"; /* needs to match `grid-column-end: span X`, below */
     grid-template-rows: auto minmax(0, 1fr);
