@@ -40,7 +40,6 @@ class ImageWindow {
         return this.windows[id]
     }
 
-    path;
     id;
     window;
     image;
