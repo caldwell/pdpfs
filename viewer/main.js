@@ -169,13 +169,13 @@ class ImageWindow {
         this.update_entries();
     }
 
-    async rm_selected() {
-        await this.rm(...this.selected)
+    rm_selected() {
+        this.rm(...this.selected)
     }
 
-    async rm(...files) {
+    rm(...files) {
         for (let file of files)
-            await this.image.rm(file);
+            this.image.rm(file);
         this.update_entries();
         this.update_edited();
     }
