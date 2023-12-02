@@ -188,6 +188,45 @@ class ImageWindow {
     }
 }
 
+class NewImageWindow {
+    constructor() {
+        let win = new BrowserWindow({
+            width: 400,
+            height: 300,
+            resizable: false,
+            minimizable: false,
+            maximizable: false,
+            closable: false,
+            webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+            },
+            title: "New Image",
+        })
+        this.window = win;
+        ImageWindow.windows[win.id] = this;
+
+        win.loadFile('web/index.html', { query: { kind: 'new' } })
+
+        win.on('closed', (event) => this.closed(event))
+        win.webContents.ipc.on('new:cancel', () => this.cancel())
+        win.webContents.ipc.on('new:create', (event, image_type, device_type, image_size, filesystem) => this.create(image_type, device_type, image_size, filesystem))
+    }
+
+    closed() {
+        delete ImageWindow.windows[this.window.id];
+    }
+
+    cancel() {
+        this.window.destroy();
+    }
+
+    create(image_type, device_type, image_size, filesystem) {
+        let image = Image.create(image_type, device_type, image_size, filesystem);
+        new ImageWindow(image);
+        this.window.destroy();
+    }
+}
+
 async function open_image_dialog() {
     console.log("open_image_dialog()");
     const { canceled, filePaths } = await dialog.showOpenDialog();
@@ -256,6 +295,9 @@ app.on('open-file', (event, path) => {
     open_image(path);
 })
 
+app.on('menu:file/new', (event) => {
+    new NewImageWindow()
+});
 app.on('menu:file/open', (event) => {
     open_image_dialog();
 })

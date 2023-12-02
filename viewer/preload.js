@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('pdpfs', {
     rm:                    (...files)   => ipcRenderer.invoke('pdpfs:rm', ...files),
     save:                  ()           => ipcRenderer.invoke('pdpfs:save'),
     set_selected:          (selected)   => ipcRenderer.send('app:set_selected', selected),
+    // New Image Dialog
+    cancel:                ()           => ipcRenderer.send('new:cancel'),
+    create:                (image_type, device_type, image_size, filesystem) =>
+                                           ipcRenderer.send('new:create', image_type, device_type, image_size, filesystem),
 })
 
 ipcRenderer.on('pdpfs', (e, type, detail) => window.dispatchEvent(new CustomEvent(type, { detail:detail })))

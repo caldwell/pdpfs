@@ -54,8 +54,9 @@ const to_num = (s) => s == undefined ? undefined : Number(s);
 
 function app() {
     const image_id = to_num(location.searchParams.get("id"));
+    const new_image = location.searchParams.get('kind')=='new';
 
-    return jsr(image_id == undefined ? ['div', "Loading Disk Image..."] : [diskimageview, { image_id: image_id }]);
+    return jsr(new_image ? [new_image_setup] : [diskimageview, { image_id: image_id }]);
 }
 
 function diskimageview({image_id}) {
@@ -289,6 +290,61 @@ function useSelection(on_change) {
                         })])
         }
     }
+}
+
+function from_human(s) {
+    let m;
+    if (m = s.match(/^\s*([\d.]+)\s*([kmgtey])?b?\s*$/i)) {
+        let unit = m[2] == undefined ? 0 : "bkmgtey".search(m[2].toLowerCase());
+        if (unit == -1) return undefined;
+        return Number(m[1]) * 1024 ** unit;
+    }
+    return undefined
+}
+function human(v) {
+    let e = Math.floor(Math.log(v)/Math.log(1024));
+    return `${(v/(1024 ** e)).toFixed(v < 1024 ? 0 : 2)} ${"BKMGTEY".charAt(e)}${v < 1024 ? '' : 'B'}`;
+}
+
+const device_type_size = {
+    rx01: "256256",
+    rx02: "512512",
+};
+function new_image_setup({}) {
+    const [image_type,  set_image_type]  = React.useState("img");
+    const [device_type, set_device_type] = React.useState("rx01");
+    const [image_size,  set_image_size]  = React.useState("1MB");
+    const [filesystem,  set_filesystem]  = React.useState("rt11");
+
+    const bytes = from_human(image_size);
+
+    return jsr(['div', { className: "new-image" },
+                ['div', { className: "settings" },
+                 ['label', "Disk Image Type"],
+                 ['select', { defaultValue: "img", onChange: (e) => set_image_type(e.target.value) },
+                  ['option', { value: "img" }, "IMG"],
+                  ['option', { value: "imd" }, "IMD"],],
+                 ['label', "Device Type"],
+                 ['select', { defaultValue: "rx01", onChange: (e) => set_device_type(e.target.value) },
+                  ['option', { value: "rx01" }, "RX01"],
+                  ['option', { value: "flat" }, "Custom Sized Image"]],
+                 ['label', "Image Size", device_type != "flat" && { className: "disabled" }],
+                 device_type != "flat" ? ['div', { className: "size", key: "read" }, human(device_type_size[device_type])]
+                                       : ['div', { className: "size" },
+                                          ['input', { type: "text", size: 14, key: "edit", defaultValue: "1 MB",
+                                                      className: `${bytes == undefined ? "error" : ""}`,
+                                                      onChange: (e) => set_image_size(e.target.value) }],
+                                          ['div', { className: "help" }, "Valid forms: 942, 10 M, 10 MB, 10m, 10mb"]],
+                 ['label', "File System Format"],
+                 ['select', { defaultValue: "rt11", onChange: (e) => set_filesystem(e.target.value) },
+                  ['option', { value: "rt11" }, "RT-11"],
+                  ['option', { value: "xxdp" }, "XXDP"]]],
+                ['div', { className: "buttons" },
+                 ['button', { className: "cancel", type: "button" }, "Cancel",
+                  { onClick: () => pdpfs.cancel() }],
+                 ['button', { className: "ok",     type: "button" }, "Create",
+                  device_type == 'flat' && (bytes == undefined || bytes < 20*512) && { disable: "true" },
+                  { onClick: () => pdpfs.create(image_type, device_type, device_type == 'flat' ? bytes : undefined, filesystem) }]]])
 }
 
 function svg({icon}) {
