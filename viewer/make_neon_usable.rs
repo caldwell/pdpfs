@@ -33,11 +33,22 @@ pub trait FromJs : Sized {
     type Input: Value;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self>;
 }
+pub trait ToJs<'a,'b> : Sized {
+    type Output: Value;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>>;
+}
 
 impl FromJs for bool {
     type Input=JsBoolean;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
         Ok(from.value(cx))
+    }
+}
+
+impl<'a,'b> ToJs<'a,'b> for bool {
+    type Output=JsBoolean;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.boolean(*self))
     }
 }
 
@@ -48,6 +59,13 @@ impl FromJs for u32 {
     }
 }
 
+impl<'a,'b> ToJs<'a,'b> for u32 {
+    type Output=JsNumber;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.number(*self))
+    }
+}
+
 impl FromJs for String {
     type Input=JsString;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
@@ -55,10 +73,25 @@ impl FromJs for String {
     }
 }
 
+impl<'a,'b> ToJs<'a,'b> for String {
+    type Output=JsString;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.string(self))
+    }
+}
+
 impl FromJs for PathBuf {
     type Input=JsString;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
         Ok(Path::new(&from.value(cx)).to_owned())
+    }
+}
+
+impl<'a,'b> ToJs<'a,'b> for PathBuf {
+    type Output=JsString;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        let s = self.to_str().ok_or_else(|| format!("Couldn't convert {} to String", self.display())).into_jserr(cx)?;
+        Ok(cx.string(s))
     }
 }
 
@@ -95,6 +128,23 @@ impl<T: FromJs> FromJs for Option<T> {
             let v = from.downcast(cx).map_err(|e| format!("{:?}", e)).into_jserr(cx)?;
             Ok(Some(T::from(cx, v)?))
         }
+    }
+}
+
+impl<'a,'b,T: ToJs<'a,'b>> ToJs<'a,'b> for Option<T> {
+    type Output=JsValue;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        match self {
+            None => Ok(cx.null().as_value(cx)),
+            Some(v) => v.to(cx).map(|v| v.as_value(cx)),
+        }
+    }
+}
+
+impl<'a,'b> ToJs<'a,'b> for Handle<'a,JsValue> {
+    type Output=JsValue;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(self.as_value(cx))
     }
 }
 
@@ -182,10 +232,11 @@ pub fn obj_set_null<'a, C: Context<'a>>(cx: &mut C, obj: &Handle<JsObject>, k: &
 }
 
 // Seriously, neon????
-pub fn vec_to_array<'a, C: Context<'a>>(cx: &mut C, vec: &Vec<Handle<JsValue>>) -> JsResult<'a, JsArray> {
+pub fn vec_to_array<'a,'b, T:ToJs<'a,'b>>(cx: &mut FunctionContext<'a>, vec: &'b [T]) -> JsResult<'a, JsArray> {
     let a = JsArray::new(cx, vec.len() as u32);
     for (i, v) in vec.iter().enumerate() {
-        a.set(cx, i as u32, v.clone())?;
+        let jv = v.to(cx)?;
+        a.set(cx, i as u32, jv)?;
     }
     Ok(a)
 }
