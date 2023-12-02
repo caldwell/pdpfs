@@ -25,6 +25,7 @@ pub use strum;
 #[strum(serialize_all = "lowercase")]
 pub enum DeviceType {
     RX01,
+    RX02,
     Flat(usize),
 }
 
@@ -32,6 +33,7 @@ impl DeviceType {
     pub fn geometry(&self) -> Geometry {
         match self {
             DeviceType::RX01 => RX01_GEOMETRY,
+            DeviceType::RX02 => RX02_GEOMETRY,
             DeviceType::Flat(size) => Geometry {
                 cylinders: 1,
                 heads: 1,
@@ -227,7 +229,8 @@ pub fn create_image(imtype: ImageType, dtype: DeviceType, fstype: FileSystemType
 
     fn create_device<'a, P: PhysicalBlockDevice + 'a>(dtype: DeviceType, phys: P) -> Box<dyn BlockDevice+'a> {
         match dtype {
-            DeviceType::RX01    => Box::new(RX(phys)),
+            DeviceType::RX01    |
+            DeviceType::RX02    => Box::new(RX(phys)),
             DeviceType::Flat(_) => Box::new(Flat(phys)),
         }
     }
