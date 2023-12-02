@@ -17,9 +17,9 @@ use std::path::{PathBuf, Path};
 use anyhow::{anyhow, Context};
 use pretty_hex::PrettyHex;
 use serde::Deserialize;
-use strum::EnumVariantNames;
+use strum::{EnumVariantNames, EnumString};
 
-#[derive(Debug, Deserialize, EnumVariantNames)]
+#[derive(Debug, Deserialize, EnumVariantNames, EnumString)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum DeviceType {
@@ -27,7 +27,7 @@ pub enum DeviceType {
     Flat(usize),
 }
 
-#[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames)]
+#[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames, EnumString)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum ImageType {
@@ -47,7 +47,7 @@ impl ImageType {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames)]
+#[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames, EnumString)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum FileSystemType {

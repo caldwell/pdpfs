@@ -2,7 +2,7 @@
 
 use neon::prelude::*;
 
-use std::{fmt::{Debug, Display}, path::{PathBuf, Path}};
+use std::{fmt::{Debug, Display}, path::{PathBuf, Path}, convert::TryFrom};
 
 #[derive(Debug)]
 pub enum Error {
@@ -65,11 +65,36 @@ impl FromJs for PathBuf {
 impl FromJs for pdpfs::ops::ImageType {
     type Input=JsString;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
-        Ok(match from.value(cx).as_str() {
-            "img" => pdpfs::ops::ImageType::IMG,
-            "imd" => pdpfs::ops::ImageType::IMD,
-            _ => Err(format!("Unknown image type: {}", from.value(cx))).into_jserr(cx)?
-        })
+        Self::try_from(from.value(cx).as_str())
+            .map_err(|_| format!("Unknown image type: {}", from.value(cx))).into_jserr(cx)
+    }
+}
+
+impl FromJs for pdpfs::ops::DeviceType {
+    type Input=JsString;
+    fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
+        Self::try_from(from.value(cx).as_str())
+            .map_err(|_| format!("Unknown device type: {}", from.value(cx))).into_jserr(cx)
+    }
+}
+
+impl FromJs for pdpfs::ops::FileSystemType {
+    type Input=JsString;
+    fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
+        Self::try_from(from.value(cx).as_str())
+            .map_err(|_| format!("Unknown filesystem type: {}", from.value(cx))).into_jserr(cx)
+    }
+}
+
+impl<T: FromJs> FromJs for Option<T> {
+    type Input=JsValue;
+    fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
+        if from.is_a::<JsNull, _>(cx) || from.is_a::<JsUndefined, _>(cx) {
+            Ok(None)
+        } else {
+            let v = from.downcast(cx).map_err(|e| format!("{:?}", e)).into_jserr(cx)?;
+            Ok(Some(T::from(cx, v)?))
+        }
     }
 }
 
