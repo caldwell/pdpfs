@@ -69,6 +69,9 @@ impl<B: BlockDevice> XxdpFs<B> {
             Mfd::VariantTwo(ref v2) => v2.bitmap_block,
         })?;
         bitmap.truncate(image.blocks()); // The bitmap is usually a lot bigger on disk than it needs to be
+        if image.blocks() > bitmap.len() {
+            return Err(anyhow!("Bitmap is too short {} < {}", bitmap.len(), image.blocks()));
+        }
         Ok((mfd,
             ufd,
             ufd_block_list,
