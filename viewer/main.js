@@ -79,6 +79,13 @@ class ImageWindow {
 
         win.loadFile('web/index.html', { query: { id: this.image.id } })
 
+        const modifies = (f) =>
+              (...args) => {
+                  let ret = f(...args);
+                  this.update_edited();
+                  return ret;
+              };
+
         win.on('close', (event) => this.close(event));
         win.on('closed', (event) => this.closed(event))
         win.on('focus', (event) => this.focus(event));
@@ -86,6 +93,10 @@ class ImageWindow {
         win.webContents.ipc.on('ondragstart', (event) => this.drag_start());
         win.webContents.ipc.handle('pdpfs:rm', (event, ...files) => this.rm(...files));
         win.webContents.ipc.handle('pdpfs:mv', (event, src, dest) => this.mv(src, dest));
+        win.webContents.ipc.handle('pdpfs:get_directory_entries',          (event)       => this.image.get_directory_entries());
+        win.webContents.ipc.handle('pdpfs:image_is_dirty',                 (event)       => this.image.image_is_dirty());
+        win.webContents.ipc.handle('pdpfs:cp_into_image',         modifies((event, path) => this.image.cp_into_image(path)));
+        win.webContents.ipc.handle('pdpfs:save',                  modifies((event)       => this.image.save()));
     }
 
     send(type, detail) {
@@ -283,21 +294,6 @@ function open_image(image_path) {
         dialog.showErrorBox(`Unable to open ${path.basename(image_path)}`,
                             `There was an error loading the image: ${e}`);
     }
-}
-
-const with_image = (func) =>
-      async (event, ...args) => {
-          let win = BrowserWindow.fromWebContents(event.sender);
-          let w = ImageWindow.from_id(win.id);
-          return await func(w.image, args, w, event) //data.image.id, args, data, event);
-      };
-
-for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'save',]) {
-    ipcMain.handle(`pdpfs:${api}`, with_image(async (image, args, w) => {
-        let ret = image[api](...args);
-        w.update_edited();
-        return ret;
-    }));
 }
 
 const update_menus = (selected, is_image_window) => {
