@@ -110,6 +110,13 @@ impl FromJs for pdpfs::ops::ImageType {
     }
 }
 
+impl<'a,'b> ToJs<'a,'b> for pdpfs::ops::ImageType {
+    type Output=JsString;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.string(self.to_string()))
+    }
+}
+
 impl FromJs for pdpfs::ops::DeviceType {
     type Input=JsString;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
@@ -118,11 +125,25 @@ impl FromJs for pdpfs::ops::DeviceType {
     }
 }
 
+impl<'a,'b> ToJs<'a,'b> for pdpfs::ops::DeviceType {
+    type Output=JsString;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.string(self.to_string()))
+    }
+}
+
 impl FromJs for pdpfs::ops::FileSystemType {
     type Input=JsString;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
         Self::try_from(from.value(cx).as_str())
             .map_err(|_| format!("Unknown filesystem type: {}", from.value(cx))).into_jserr(cx)
+    }
+}
+
+impl<'a,'b> ToJs<'a,'b> for pdpfs::ops::FileSystemType {
+    type Output=JsString;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.string(self.to_string()))
     }
 }
 
