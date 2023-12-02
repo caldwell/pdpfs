@@ -80,6 +80,13 @@ impl<'a,'b> ToJs<'a,'b> for String {
     }
 }
 
+impl<'a,'b> ToJs<'a,'b> for &'a str {
+    type Output=JsString;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(cx.string(self))
+    }
+}
+
 impl FromJs for PathBuf {
     type Input=JsString;
     fn from(cx: &mut FunctionContext, from: Handle<Self::Input>) -> NeonResult<Self> {
