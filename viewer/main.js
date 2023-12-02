@@ -82,6 +82,7 @@ class ImageWindow {
         win.on('close', (event) => this.close(event));
         win.on('closed', (event) => this.closed(event))
         win.on('focus', (event) => this.focus(event));
+        win.webContents.ipc.on('app:set_selected', (event, selected) => this.set_selected(selected));
     }
 
     send(type, detail) {
@@ -132,6 +133,10 @@ class ImageWindow {
 
     focus(event) {
         update_menus(this.selected)
+    }
+
+    set_selected(selected) {
+        update_menus(this.selected = selected);
     }
 
     create_temp_path() {
@@ -290,9 +295,6 @@ ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
     })
 }))
 
-ipcMain.on('app:set_selected', with_image((image, [selected], w) => {
-    update_menus(w.selected = selected);
-}))
 
 const update_menus = (selected) => {
     enable_menu_items("sel", selected.length > 0);
