@@ -114,87 +114,87 @@ body {
     grid-template-columns: min-content;
     height: 100vh;
     align-content: start;
-}
 
-.directory-list .body {
-    position: relative; /* so hover fills in nicely */
-    grid-auto-rows: min-content;
-    overflow-y: scroll;
-}
-.directory-list.hover .body::before {
-    content: " ";
-    position: absolute;
-    border: 2px solid var(--drop-outline);
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-}
+    .body {
+        position: relative; /* so hover fills in nicely */
+        grid-auto-rows: min-content;
+        overflow-y: scroll;
+    }
+    .directory-list.hover .body::before {
+        content: " ";
+        position: absolute;
+        border: 2px solid var(--drop-outline);
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+    }
 
-.header, .direntry, .body {
-    display: grid;
-    grid-template-columns: subgrid;
-    grid-column-end: span 5; /* needs to match `grid-template-areas:`, above */
-}
+    .header, .direntry, .body {
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column-end: span 5; /* needs to match `grid-template-areas:`, above */
+    }
 
-.direntry {
-    margin: 0 8px;
-}
+    .direntry {
+        margin: 0 8px;
+    }
 
-.directory-list .icon {
-    grid-area: i;
-    padding-left: 1em;
-}
+    .icon {
+        grid-area: i;
+        padding-left: 1em;
+    }
 
-.directory-list .filename {
-    grid-area: f;
-    color: var(--filename);
-    padding-left: .4rem;
-}
+    .filename {
+        grid-area: f;
+        color: var(--filename);
+        padding-left: .4rem;
+    }
 
-.blocks {
-    grid-area: b;
-    color: var(--boring);
-}
-.size {
-    grid-area: s;
-    color: var(--boring);
-}
-.date {
-    grid-area: d;
-    color: var(--boring);
-}
-.header {
-    position: sticky;
-    top: 0px;
-    background: var(--background);
-    border-bottom: 1px solid var(--separator);
-    margin: 0; /* So the border line goes all the way to the left and right edges */
-}
-.directory-list div {
-    padding: .1rem 0;
-}
-.directory-list .direntry {
-    border-radius: 7px;
-}
-.directory-list .direntry:nth-child(2n) {
-    background-color: var(--zebra);
-}
-.directory-list .direntry.selected {
-    background-color: var(--selection);
-}
+    .blocks {
+        grid-area: b;
+        color: var(--boring);
+    }
+    .size {
+        grid-area: s;
+        color: var(--boring);
+    }
+    .date {
+        grid-area: d;
+        color: var(--boring);
+    }
+    .header {
+        position: sticky;
+        top: 0px;
+        background: var(--background);
+        border-bottom: 1px solid var(--separator);
+        margin: 0; /* So the border line goes all the way to the left and right edges */
+    }
+    div {
+        padding: .1rem 0;
+    }
+    .direntry {
+        border-radius: 7px;
+    }
+    .direntry:nth-child(2n) {
+        background-color: var(--zebra);
+    }
+    .direntry.selected {
+        background-color: var(--selection);
+    }
 
-/* Make consecutive selections meld together nicely */
-.direntry.selected + .direntry.selected {
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
-}
-.direntry.selected:has(+ .direntry.selected) {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-}
+    /* Make consecutive selections meld together nicely */
+    .direntry.selected + .direntry.selected {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+    }
+    .direntry.selected:has(+ .direntry.selected) {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
 
-.directory-list .body {
-  grid-auto-rows: min-content;
-  overflow-y: scroll;
+    .body {
+        grid-auto-rows: min-content;
+        overflow-y: scroll;
+    }
 }
