@@ -339,7 +339,8 @@ function new_image_setup({}) {
                   { onClick: () => pdpfs.cancel() }],
                  ['button', { className: "ok",     type: "button" }, "Create",
                   device_type == 'flat' && (bytes == undefined || bytes < 20*512) && { disable: "true" },
-                  { onClick: () => pdpfs.create(image_type, device_type, device_type == 'flat' ? bytes : undefined, filesystem) }]]])
+                  { onClick: () => pdpfs.create(image_type, device_type == 'flat' ? undefined : device_type,
+                                                device_type == 'flat' ? bytes : undefined, filesystem) }]]])
 }
 
 function svg({icon}) {
