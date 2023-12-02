@@ -27,6 +27,20 @@ pub enum DeviceType {
     Flat(usize),
 }
 
+impl DeviceType {
+    pub fn geometry(&self) -> Geometry {
+        match self {
+            DeviceType::RX01 => RX01_GEOMETRY,
+            DeviceType::Flat(size) => Geometry {
+                cylinders: 1,
+                heads: 1,
+                sectors: size/512,
+                sector_size: 512,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, Copy, EnumVariantNames, EnumString)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -208,15 +222,7 @@ pub fn mv(fs: &mut impl FileSystem, src: &Path, dest: &Path, overwrite_dest: boo
 }
 
 pub fn create_image(imtype: ImageType, dtype: DeviceType, fstype: FileSystemType) -> anyhow::Result<Box<dyn FileSystem<BlockDevice = Box<dyn BlockDevice>>>> {
-    let (size, geometry) = match dtype {
-        DeviceType::RX01 => (256256, RX01_GEOMETRY),
-        DeviceType::Flat(size) => (size, Geometry {
-            cylinders: 1,
-            heads: 1,
-            sectors: size/512,
-            sector_size: 512,
-        }),
-    };
+    let geometry = dtype.geometry();
 
     fn create_device<'a, P: PhysicalBlockDevice + 'a>(dtype: DeviceType, phys: P) -> Box<dyn BlockDevice+'a> {
         match dtype {
@@ -226,8 +232,8 @@ pub fn create_image(imtype: ImageType, dtype: DeviceType, fstype: FileSystemType
     }
 
     let dev = match imtype {
-        ImageType::IMD => create_device(dtype, IMD::from_raw(vec![0; size], geometry)),
-        ImageType::IMG => create_device(dtype, IMG::from_raw(vec![0; size], geometry)),
+        ImageType::IMD => create_device(dtype, IMD::from_raw(vec![0; geometry.bytes()], geometry)),
+        ImageType::IMG => create_device(dtype, IMG::from_raw(vec![0; geometry.bytes()], geometry)),
     };
 
     Ok(match fstype {
