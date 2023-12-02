@@ -21,8 +21,7 @@ impl<B: PhysicalBlockDevice> BlockDevice for Flat<B> {
     }
 
     fn sectors(&self) -> usize {
-        let g = self.0.geometry();
-        g.cylinders * g.heads * g.sectors
+        self.0.geometry().sectors()
     }
 
     fn physical_device(&self) -> Box<&dyn PhysicalBlockDevice> {
