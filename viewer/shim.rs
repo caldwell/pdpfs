@@ -21,7 +21,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("create_image", create_image)?;
     cx.export_function("image_is_dirty", image_is_dirty)?;
     cx.export_function("get_directory_entries", get_directory_entries)?;
-    cx.export_function("extract_to_path", extract_to_path)?;
+    cx.export_function("cp_from_image", cp_from_image)?;
     cx.export_function("cp_into_image", cp_into_image)?;
     cx.export_function("mv", mv)?;
     cx.export_function("rm", rm)?;
@@ -117,17 +117,12 @@ fn get_directory_entries(mut cx: FunctionContext) -> JsResult<JsArray> {
     vec_to_array(&mut cx, &entries)
 }
 
-fn extract_to_path(mut cx: FunctionContext) -> JsResult<JsNull> {
-    js_args!(&mut cx, id: u32, path: PathBuf);
-    with_image_id(id, |image| -> Result<(),String> {
-        std::fs::create_dir_all(&path).map_err(|e| format!("Could't create directory: {}", e))?;
-        for entry in image.fs.read_dir("/")
-            .map_err(|e| format!("Could't read directory: {}", e))?
-        {
-            std::fs::write(path.join(&entry.file_name()), image.fs.read_file(&entry.file_name()).unwrap().as_bytes())
-                .map_err(|e| format!("Could't write {}: {}", path.join(&entry.file_name()).display(), e))?;
-        }
-        Ok(())
+fn cp_from_image(mut cx: FunctionContext) -> JsResult<JsNull> {
+    js_args!(&mut cx, id: u32, src: String, dest: PathBuf);
+    with_image_id(id, |image| {
+        pdpfs::ops::cp_from_image(&mut image.fs, &Path::new(&src), &dest)
+            .map_err(|e| format!("Could't write {}: {}", dest.display(), e))
+            .and_then(|_| { Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }

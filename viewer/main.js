@@ -28,11 +28,11 @@ class Image {
 
     get_directory_entries()          { return pdpfs.get_directory_entries(this.id)            }
     cp_into_image        (path)      { return pdpfs.cp_into_image        (this.id, path)      }
+    cp_from_image        (src, dest) { return pdpfs.cp_from_image        (this.id, src, dest) }
     image_is_dirty       ()          { return pdpfs.image_is_dirty       (this.id)            }
     mv                   (src, dest) { return pdpfs.mv                   (this.id, src, dest, false) }
     rm                   (path)      { return pdpfs.rm                   (this.id, path)      }
     save                 ()          { return pdpfs.save                 (this.id, this.path) }
-    extract_to_path      (path)      { return pdpfs.extract_to_path      (this.id, path)      }
     convert              (file,
                           image_type){ return pdpfs.convert              (this.id, file, image_type) }
 
@@ -113,9 +113,8 @@ class ImageWindow {
     }
 
     closed(event) {
-        if (this.temp_path) {
-            // cleanup
-        }
+        if (this.temp_path)
+            this.clean_temp_path();
         if (this.image)
             this.image.close();
         delete ImageWindow.windows[this.window.id];
@@ -136,9 +135,19 @@ class ImageWindow {
     }
 
     create_temp_path() {
-        // Sadly because of the way Electron drag and drop works, we _have_ to have the file ready to go
+        // Sadly because of the way Electron drag and drop works, we _have_ to have a file on the disk as the source when we drag.
+        this.paths_to_clean ??= {};
         this.temp_path = fs.mkdtempSync(path.join(app.getPath("temp"), "image-XXXXXXXX"));
-        this.image.extract_to_path(this.temp_path);
+    }
+
+    clean_temp_path() {
+        try {
+            for (let f of Object.keys(this.paths_to_clean))
+                fs.rmSync(path.join(this.temp_path, f), { force: true });
+            fs.rmdirSync(this.temp_path);
+        } catch(e) {
+            console.log(`Got error cleaning up ${this.temp_path}:`, e); // Temp files: don't bug the user--logging is good enough.
+        }
     }
 
     async update_edited() {
@@ -268,6 +277,13 @@ ipcMain.handle('pdpfs:mv', with_image((image, [src, dest], w) => w.mv(src, dest)
 
 ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
     if (!filenames) filenames = w.selected;
+    console.log(`dragging [${image.id}] ${w.temp_path}/{${filenames.join(',')}}...`);
+
+    for (let f of filenames) {
+        image.cp_from_image(f, path.join(w.temp_path, f));
+        w.paths_to_clean[f] = true;
+    }
+
     w.window.webContents.startDrag({
         files: filenames.map(f => path.join(w.temp_path, f)),
         icon: path.join(__dirname, filenames.length == 1 ? 'web/stack-96.png' : 'web/stack-96.png'),
