@@ -132,11 +132,11 @@ class ImageWindow {
     }
 
     focus(event) {
-        update_menus(this.selected)
+        update_menus(this.selected, true)
     }
 
     set_selected(selected) {
-        update_menus(this.selected = selected);
+        update_menus(this.selected = selected, true);
     }
 
     create_temp_path() {
@@ -225,12 +225,17 @@ class NewImageWindow {
         win.loadFile('web/index.html', { query: { kind: 'new' } })
 
         win.on('closed', (event) => this.closed(event))
+        win.on('focus', (event) => this.focus(event));
         win.webContents.ipc.on('new:cancel', () => this.cancel())
         win.webContents.ipc.on('new:create', (event, image_type, device_type, image_size, filesystem) => this.create(image_type, device_type, image_size, filesystem))
     }
 
     closed() {
         delete ImageWindow.windows[this.window.id];
+    }
+
+    focus(event) {
+        update_menus([], false)
     }
 
     cancel() {
@@ -296,9 +301,10 @@ ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
 }))
 
 
-const update_menus = (selected) => {
+const update_menus = (selected, is_image_window) => {
     enable_menu_items("sel", selected.length > 0);
     enable_menu_items("one_sel", selected.length == 1);
+    enable_menu_items("img", is_image_window);
 }
 
 const curr_win = () => BrowserWindow.getFocusedWindow();
@@ -407,12 +413,12 @@ const menu = new Menu.buildFromTemplate(
               { label: 'Open Disk Image…',    click: emitter('menu:file/open'),                  accelerator: shortcut('O') },
               { role: 'recentDocuments' },
               { type: 'separator' },
-              { role: 'close',                click: emitter('menu:file/close'),   need:["win"] },
-              { label: 'Save Disk Image',     click: emitter('menu:file/save'),    need:["win"], accelerator: shortcut('S') },
-              { label: 'Save Disk Image As…', click: emitter('menu:file/save-as'), need:["win"] },
+              { role: 'close',                click: emitter('menu:file/close') },
+              { label: 'Save Disk Image',     click: emitter('menu:file/save'),    need:["img"], accelerator: shortcut('S') },
+              { label: 'Save Disk Image As…', click: emitter('menu:file/save-as'), need:["img"] },
               { type: 'separator' },
               { label: 'Export Files…',       click: emitter('menu:file/export'),  need:["sel"] },
-              { label: 'Import Files…',       click: emitter('menu:file/import'),  need:["win"] },
+              { label: 'Import Files…',       click: emitter('menu:file/import'),  need:["img"] },
               { label: 'Delete',              click: emitter('menu:file/delete'),  need:["sel"], accelerator: shortcut('Backspace')},
               { label: 'Rename',              click: emitter('menu:file/rename'),  need:["one_sel"] },
               ...non_mac({ type: 'separator' },
