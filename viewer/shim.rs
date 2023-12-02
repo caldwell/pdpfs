@@ -4,6 +4,7 @@ extern crate lazy_static;
 mod make_neon_usable;
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Mutex;
@@ -27,6 +28,9 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("save", save)?;
     cx.export_function("convert", convert)?;
     cx.export_function("filesystem_name", filesystem_name)?;
+    cx.export_function("device_types", device_types)?;
+    cx.export_function("image_types", image_types)?;
+    cx.export_function("filesystems", filesystems)?;
     Ok(())
 }
 
@@ -184,4 +188,29 @@ fn filesystem_name(mut cx: FunctionContext) -> JsResult<JsString> {
         Result::<_,String>::Ok(cx.string(&image.fs.filesystem_name()))
     }).into_jserr(&mut cx)?;
     Ok(fs_name)
+}
+
+use pdpfs::ops::strum::VariantNames;
+fn device_types<'a>(mut cx: FunctionContext<'a>) -> JsResult<JsArray> {
+    let v = pdpfs::ops::DeviceType::VARIANTS.iter().map(|name| {
+        let dtype = pdpfs::ops::DeviceType::try_from(*name).unwrap(/*would be weird if the variants and the enum didn't match*/);
+        let obj = cx.empty_object();
+        obj_set_string(&mut cx, &obj, "name", name)?;
+        obj_set_number(&mut cx, &obj, "bytes", dtype.geometry().bytes() as u32)?;
+        obj_set_number(&mut cx, &obj, "cylinders", dtype.geometry().cylinders as u32)?;
+        obj_set_number(&mut cx, &obj, "heads", dtype.geometry().heads as u32)?;
+        obj_set_number(&mut cx, &obj, "sectors", dtype.geometry().sectors as u32)?;
+        obj_set_number(&mut cx, &obj, "sector_size", dtype.geometry().sector_size as u32)?;
+        Ok(obj.upcast())
+    }).collect::<NeonResult<Vec<Handle<JsValue>>>>()?;
+
+    vec_to_array(&mut cx, &v)
+}
+
+fn image_types(mut cx: FunctionContext) -> JsResult<JsArray> {
+    vec_to_array(&mut cx, &pdpfs::ops::ImageType::VARIANTS)
+}
+
+fn filesystems(mut cx: FunctionContext) -> JsResult<JsArray> {
+    vec_to_array(&mut cx, &pdpfs::ops::FileSystemType::VARIANTS)
 }
