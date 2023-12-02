@@ -11,10 +11,19 @@ class Image {
     path;
     id;
 
-    constructor(image_path) {
+    constructor({image_path,image_id}) {
         this.path = image_path;
-        this.id = pdpfs.open_image(image_path);
+        if (image_id != undefined)
+            this.id = image_id;
+        else if (image_path != undefined)
+            this.id = pdpfs.open_image(image_path);
+        else throw("Need image_path or image_id");
         Image.images[this.id] = this;
+    }
+
+    static create(image_type, device_type, image_size, filesystem) {
+        let image_id = pdpfs.create_image(image_type, device_type, image_size, filesystem);
+        return new Image({image_id});
     }
 
     get_directory_entries()          { return pdpfs.get_directory_entries(this.id)            }
@@ -47,23 +56,26 @@ class ImageWindow {
     constructor(image) {
         this.image = image;
         this.selected = [];
-        this.create_temp_path();
-        this.create_window(`${pdpfs.filesystem_name(this.image.id)}: ${this.image.path}`);
+        if (image) {
+            this.create_temp_path();
+            this.create_window();
+        } else
+            this.create_new_window();
     }
 
-    create_window(title) {
+    create_window() {
         let win = new BrowserWindow({
             width: 800,
             height: 600,
             webPreferences: {
                 preload: path.join(__dirname, 'preload.js')
             },
-            title: title,
+            title: this.title(),
         })
         this.window = win;
         ImageWindow.windows[win.id] = this;
 
-        win.setRepresentedFilename(this.image.path);
+        this.setup_titlebar();
 
         win.loadFile('web/index.html', { query: { id: this.image.id } })
 
@@ -82,9 +94,11 @@ class ImageWindow {
         event.preventDefault();
 
         let { response } = await dialog.showMessageBox(this.window, {
-            message: `${path.basename(this.image.path)} has unsaved changes.`,
+            message: this.image.path ? `${path.basename(this.image.path)} has unsaved changes.`
+                                     : 'This disk image has not been saved.',
             type: "question",
-            buttons: ["&Cancel", "&Discard Changes", "&Save Changes"],
+            buttons: this.image.path ? ["&Cancel", "&Discard Changes", "&Save Changes"]
+                                     : ["&Cancel", "&Discard",         "&Save"],
             defaultId: 2,
             normalizeAccessKeys: true,
         });
@@ -93,7 +107,7 @@ class ImageWindow {
         if (response == 1) // Discard
             this.window.destroy();
         if (response == 2) { // Save
-            this.image.save();
+            this.save();
             this.window.close();
         }
     }
@@ -102,8 +116,19 @@ class ImageWindow {
         if (this.temp_path) {
             // cleanup
         }
-        this.image.close();
+        if (this.image)
+            this.image.close();
         delete ImageWindow.windows[this.window.id];
+    }
+
+    title() {
+        return `${pdpfs.filesystem_name(this.image.id)}: ${this.image.path ?? "(Unsaved)"}`
+    }
+
+    setup_titlebar() {
+        if (this.image.path)
+            this.window.setRepresentedFilename(this.image.path);
+        this.window.setTitle(this.title());
     }
 
     focus(event) {
@@ -140,6 +165,27 @@ class ImageWindow {
         this.update_entries();
         this.update_edited();
     }
+
+    async save() {
+        try {
+            if (!this.image.path) {
+                let { canceled, filePath, bookmark } = await dialog.showSaveDialog(this.window, {
+                    title: "Save this disk image:",
+                    defaultPath: "Disk Image.img",
+                    properties: ['createDirectory', 'showOverwriteConfirmation'],
+                });
+                if (canceled) return;
+                this.image.path = filePath;
+                console.log(canceled, filePath, bookmark);
+                this.update_edited();
+                this.setup_titlebar();
+            }
+            this.image.save();
+        } catch(e) {
+            await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
+            return;
+        }
+    }
 }
 
 async function open_image_dialog() {
@@ -153,7 +199,7 @@ async function open_image_dialog() {
 
 function open_image(image_path) {
     try {
-        new ImageWindow(new Image(image_path));
+        new ImageWindow(new Image({image_path}));
     } catch(e) {
         dialog.showErrorBox(`Unable to open ${path.basename(image_path)}`,
                             `There was an error loading the image: ${e}`);
@@ -216,7 +262,7 @@ app.on('menu:file/open', (event) => {
 
 app.on('menu:file/save', async (event) => {
     with_curr_window(async (w) => {
-        await w.image.save();
+        await w.save();
         w.update_edited();
     })
 })
