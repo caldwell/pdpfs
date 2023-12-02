@@ -2,7 +2,14 @@
 
 const { contextBridge, ipcRenderer } = require('electron')
 
+const get_hacky_args = () => {
+    try { return JSON.parse(process.argv.pop()) }
+    catch(e) { return  {} }
+};
+
 contextBridge.exposeInMainWorld('pdpfs', {
+    ...get_hacky_args(),
+
     get_directory_entries: ()           => ipcRenderer.invoke('pdpfs:get_directory_entries'),
     cp_into_image:         (path)       => ipcRenderer.invoke('pdpfs:cp_into_image', path),
     open_file:             ()           => ipcRenderer.invoke('dialog:openFile'),

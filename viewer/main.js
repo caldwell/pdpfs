@@ -199,6 +199,9 @@ class NewImageWindow {
             closable: false,
             webPreferences: {
                 preload: path.join(__dirname, 'preload.js'),
+                additionalArguments: [JSON.stringify({ device_types: pdpfs.device_types(),
+                                                       image_types:  pdpfs.image_types(),
+                                                       filesystems:  pdpfs.filesystems() })],
             },
             title: "New Image",
         })

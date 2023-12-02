@@ -306,10 +306,8 @@ function human(v) {
     return `${(v/(1024 ** e)).toFixed(v < 1024 ? 0 : 2)} ${"BKMGTEY".charAt(e)}${v < 1024 ? '' : 'B'}`;
 }
 
-const device_type_size = {
-    rx01: "256256",
-    rx02: "512512",
-};
+const device_type_size = Object.fromEntries(pdpfs.device_types.map(dtype => [dtype.name, dtype.bytes]));
+
 function new_image_setup({}) {
     const [image_type,  set_image_type]  = React.useState("img");
     const [device_type, set_device_type] = React.useState("rx01");
@@ -322,12 +320,10 @@ function new_image_setup({}) {
                 ['div', { className: "settings" },
                  ['label', "Disk Image Type"],
                  ['select', { defaultValue: "img", onChange: (e) => set_image_type(e.target.value) },
-                  ['option', { value: "img" }, "IMG"],
-                  ['option', { value: "imd" }, "IMD"],],
+                  pdpfs.image_types.map(imtype => ['option', { value: imtype }, imtype.toUpperCase()])],
                  ['label', "Device Type"],
-                 ['select', { defaultValue: "rx01", onChange: (e) => set_device_type(e.target.value) },
-                  ['option', { value: "rx01" }, "RX01"],
-                  ['option', { value: "flat" }, "Custom Sized Image"]],
+                  ['select', { defaultValue: "rx01", onChange: (e) => set_device_type(e.target.value) },
+                   pdpfs.device_types.map(dtype => ['option', { value: dtype.name }, dtype.name == 'flat' ? 'Custom Sized Image' : `${dtype.name.toUpperCase()} (${human(dtype.bytes)})`])],
                  ['label', "Image Size", device_type != "flat" && { className: "disabled" }],
                  device_type != "flat" ? ['div', { className: "size", key: "read" }, human(device_type_size[device_type])]
                                        : ['div', { className: "size" },
@@ -337,8 +333,7 @@ function new_image_setup({}) {
                                           ['div', { className: "help" }, "Valid forms: 942, 10 M, 10 MB, 10m, 10mb"]],
                  ['label', "File System Format"],
                  ['select', { defaultValue: "rt11", onChange: (e) => set_filesystem(e.target.value) },
-                  ['option', { value: "rt11" }, "RT-11"],
-                  ['option', { value: "xxdp" }, "XXDP"]]],
+                  pdpfs.filesystems.map(fs_type => ['option', { value: fs_type }, fs_type == 'rt11' ? "RT-11" : fs_type.toUpperCase()])]],
                 ['div', { className: "buttons" },
                  ['button', { className: "cancel", type: "button" }, "Cancel",
                   { onClick: () => pdpfs.cancel() }],
