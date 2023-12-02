@@ -83,6 +83,9 @@ class ImageWindow {
         win.on('closed', (event) => this.closed(event))
         win.on('focus', (event) => this.focus(event));
         win.webContents.ipc.on('app:set_selected', (event, selected) => this.set_selected(selected));
+        win.webContents.ipc.on('ondragstart', (event) => this.drag_start());
+        win.webContents.ipc.handle('pdpfs:rm', (event, ...files) => this.rm(...files));
+        win.webContents.ipc.handle('pdpfs:mv', (event, src, dest) => this.mv(src, dest));
     }
 
     send(type, detail) {
@@ -153,6 +156,21 @@ class ImageWindow {
         } catch(e) {
             console.log(`Got error cleaning up ${this.temp_path}:`, e); // Temp files: don't bug the user--logging is good enough.
         }
+    }
+
+    drag_start() {
+        let filenames = this.selected;
+        console.log(`dragging [${this.image.id}] ${this.temp_path}/{${filenames.join(',')}}...`);
+
+        for (let f of filenames) {
+            this.image.cp_from_image(f, path.join(this.temp_path, f));
+            this.paths_to_clean[f] = true;
+        }
+
+        this.window.webContents.startDrag({
+            files: filenames.map(f => path.join(this.temp_path, f)),
+            icon: path.join(__dirname, filenames.length == 1 ? 'web/stack-96.png' : 'web/stack-96.png'),
+        })
     }
 
     async update_edited() {
@@ -281,25 +299,6 @@ for (let api of ['get_directory_entries', 'cp_into_image', 'image_is_dirty', 'sa
         return ret;
     }));
 }
-
-ipcMain.handle('pdpfs:rm', with_image((image, files, w) => w.rm(...files)))
-ipcMain.handle('pdpfs:mv', with_image((image, [src, dest], w) => w.mv(src, dest)))
-
-ipcMain.on('ondragstart', with_image((image, [filenames], w) => {
-    if (!filenames) filenames = w.selected;
-    console.log(`dragging [${image.id}] ${w.temp_path}/{${filenames.join(',')}}...`);
-
-    for (let f of filenames) {
-        image.cp_from_image(f, path.join(w.temp_path, f));
-        w.paths_to_clean[f] = true;
-    }
-
-    w.window.webContents.startDrag({
-        files: filenames.map(f => path.join(w.temp_path, f)),
-        icon: path.join(__dirname, filenames.length == 1 ? 'web/stack-96.png' : 'web/stack-96.png'),
-    })
-}))
-
 
 const update_menus = (selected, is_image_window) => {
     enable_menu_items("sel", selected.length > 0);
