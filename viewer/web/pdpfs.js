@@ -175,27 +175,43 @@ function useSelection(on_change) {
     let values = React.useRef();
 
     const [selection, _set_selection] = React.useState([]);
-    function set_selection(f) {
+
+    const find_span = React.useCallback((selection, i) => {
+        let sel = selection.findIndex(span => span.start <= i && i <= span.end);
+        return sel == -1 ? undefined : sel;
+    }, []);
+    const is_selected = React.useCallback(i => find_span(selection, i) != undefined,
+                                          [find_span, selection]);
+    const set_selection = React.useCallback(f => {
         return _set_selection(current => {
             let new_selection = f(current);
             on_change(values.current.filter((v,i) => find_span(new_selection, i) != undefined));
             return new_selection;
         })
-    }
+    }, [on_change, values, _set_selection, find_span]);
 
-    function find_span(selection, i) {
-        let sel = selection.findIndex(span => span.start <= i && i <= span.end);
-        return sel == -1 ? undefined : sel;
-    }
-    function is_selected(i) {
-        return find_span(selection, i) != undefined;
-    }
-    function set_selected(i) {
+    const coalesce_selection_spans = React.useCallback(sel => {
+        sel = sel.map((span,i) => ({ span, i })).sort((a,b) => a.span.start - b.span.start);
+        for (let i = 0; i < sel.length-1; i++)
+            if (sel[i].span.end+1  >= sel[i+1].span.start) {
+                sel.splice(i,2,{ i: Math.max(sel[i].i, sel[i+1].i),
+                                 span: {
+                                     start: sel[i].span.start,
+                                     end: Math.max(sel[i].span.end, sel[i+1].span.end),
+                                     anchor: sel[i].i > sel[i+1].i ? sel[i].span.anchor : sel[i+1].span.anchor,
+                                 }});
+                i--; // We deleted an entry so set ourselves back to compensate
+            }
+        return sel.sort((a,b) => a.i - b.i).map(({span}) => span)
+    }, []);
+
+    const set_selected = React.useCallback(i => {
         set_selection(current => {
             return coalesce_selection_spans([...current, { start: i, end: i, anchor: i }]);
         });
-    }
-    function toggle_selected(i) {
+    }, [set_selection, coalesce_selection_spans]);
+
+    const toggle_selected = React.useCallback(i => {
         set_selection(current => {
             let span_i = find_span(current, i);
             if (span_i == undefined)
@@ -209,8 +225,9 @@ function useSelection(on_change) {
                 newsel.push({ start: i+1,   end: end, anchor: anchor == start ? i+1 : anchor });
             return coalesce_selection_spans(newsel);
         })
-    }
-    function set_last_selection_end(i) {
+    }, [set_selection, find_span, coalesce_selection_spans]);
+
+    const set_last_selection_end = React.useCallback(i => {
         set_selection(current => {
             let newsel = [...current];
             if (newsel.length == 0)
@@ -219,27 +236,13 @@ function useSelection(on_change) {
             newsel.push({ start: Math.min(i,anchor), end: Math.max(i,anchor), anchor: anchor });
             return coalesce_selection_spans(newsel);
         })
-    }
-    function coalesce_selection_spans(sel) {
-        sel = sel.map((span,i) => ({ span, i })).sort((a,b) => a.span.start - b.span.start);
-        for (let i = 0; i < sel.length-1; i++)
-            if (sel[i].span.end+1  >= sel[i+1].span.start) {
-                sel.splice(i,2,{ i: Math.max(sel[i].i, sel[i+1].i),
-                                 span: {
-                                     start: sel[i].span.start,
-                                     end: Math.max(sel[i].span.end, sel[i+1].span.end),
-                                     anchor: sel[i].i > sel[i+1].i ? sel[i].span.anchor : sel[i+1].span.anchor,
-                                 }});
-                i--; // We deleted an entry so set ourselves back to compensate
-            }
-        return sel.sort((a,b) => a.i - b.i).map(({span,i}) => span)
-    }
+    }, [set_selection, coalesce_selection_spans]);
 
     const mouse_state = React.useRef(false);
 
     return {
-        selected_values: () => values.current.filter((v, i) => is_selected(i)),
-        clear_selection: () => set_selection(current => []),
+        selected_values: React.useCallback(() => values.current.filter((v, i) => is_selected(i)), [values, is_selected]),
+        clear_selection: React.useCallback(() => set_selection(current => []), [set_selection]),
         make_selectable: (items) => {
             values.current = items.map((item) => item.value);
             let els = items.map((item) => item.el);
