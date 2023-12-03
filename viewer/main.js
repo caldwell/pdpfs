@@ -154,12 +154,18 @@ class ImageWindow {
         this.window.setTitle(this.title());
     }
 
+    update_menus() {
+        update_menus(this.selected, true, this.image.image_is_dirty());
+    }
+
     focus(event) {
-        update_menus(this.selected, true)
+        this.update_menus();
     }
 
     set_selected(selected) {
-        update_menus(this.selected = selected, true);
+        console.log("image.id", this.image.id, "selected", selected);
+        this.selected = selected;
+        this.update_menus();
     }
 
     create_temp_path() {
@@ -294,7 +300,7 @@ class NewImageWindow {
     }
 
     focus(event) {
-        update_menus([], false)
+        update_menus([], false, false)
     }
 
     cancel() {
@@ -326,10 +332,11 @@ function open_image(image_path) {
     }
 }
 
-const update_menus = (selected, is_image_window) => {
+const update_menus = (selected, is_image_window, is_dirty) => {
     enable_menu_items("sel", selected.length > 0);
     enable_menu_items("one_sel", selected.length == 1);
     enable_menu_items("img", is_image_window);
+    enable_menu_items("dirty", is_dirty);
 }
 
 app.on('open-file', (event, path) => {
@@ -396,7 +403,7 @@ const menu = new Menu.buildFromTemplate(
               { role: 'recentDocuments' },
               { type: 'separator' },
               { role: 'close',                id: 'file/close',   click: menu_emit },
-              { label: 'Save Disk Image',     id: 'file/save',    click: menu_emit, need:["img"], accelerator: shortcut('S') },
+              { label: 'Save Disk Image',     id: 'file/save',    click: menu_emit, need:["dirty"], accelerator: shortcut('S') },
               { label: 'Save Disk Image As…', id: 'file/save-as', click: menu_emit, need:["img"] },
               { type: 'separator' },
               { label: 'Export Files…',       id: 'file/export',  click: menu_emit, need:["sel"] },
