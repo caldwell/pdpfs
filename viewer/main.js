@@ -105,6 +105,7 @@ class ImageWindow {
         win.webContents.ipc.handle('pdpfs:save',                  modifies((event)       => this.image.save()));
         win.on('menu:file/save', async (event) => await this.save());
         win.on('menu:file/save-as', async (event) => await this.save_as());
+        win.on('menu:file/delete', (event) => this.rm_selected());
     }
 
     send(type, detail) {
@@ -333,10 +334,6 @@ const curr_window = () => {
     const win_id = curr_win()?.id;
     return win_id == undefined ? undefined : ImageWindow.from_id(win_id)
 }
-const with_curr_window = (func) => {
-    let w = curr_window();
-    if (w) func(w);
-}
 
 app.on('open-file', (event, path) => {
     event.preventDefault();
@@ -348,12 +345,6 @@ app.on('menu:file/new', (event) => {
 });
 app.on('menu:file/open', (event) => {
     open_image_dialog();
-})
-
-app.on('menu:file/delete', async (event) => {
-    with_curr_window(async (w) => {
-        w.rm_selected()
-    })
 })
 
 const shortcut = (key)      => process.platform == 'darwin' ? `Cmd+${key}` : `Ctrl+${key}`;
