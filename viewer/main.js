@@ -329,12 +329,6 @@ const update_menus = (selected, is_image_window) => {
     enable_menu_items("img", is_image_window);
 }
 
-const curr_win = () => BrowserWindow.getFocusedWindow();
-const curr_window = () => {
-    const win_id = curr_win()?.id;
-    return win_id == undefined ? undefined : ImageWindow.from_id(win_id)
-}
-
 app.on('open-file', (event, path) => {
     event.preventDefault();
     open_image(path);
@@ -352,11 +346,13 @@ const mac      = (...items) => process.platform == 'darwin' ? items : [];
 const non_mac  = (...items) => process.platform != 'darwin' ? items : [];
 const menu_emit = (menu_item) => {
     let event = `menu:${menu_item.id}`;
-    if (curr_win()?.emit(event, menu_item) == true)
+    let win = BrowserWindow.getFocusedWindow();
+    if (win?.emit(event, menu_item) == true)
         return;
     if (app.emit(event, menu_item) == true)
         return;
-    curr_window()?.send(event);
+    if (win)
+        ImageWindow.from_id(win.id)?.send(event);
 }
 
 const __need = {};
