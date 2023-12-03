@@ -42,8 +42,8 @@ class Image {
     convert              (file,
                           image_type){ return pdpfs.convert              (this.id, file, image_type) }
 
-
     close() {
+        pdpfs.close_image(this.id);
         delete Image.images[this.id];
     }
 }
