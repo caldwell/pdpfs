@@ -52,8 +52,7 @@ fn with_image_id<T,E,F>(id: u32, func: F) -> Result<T,Error>
 {
     let mut images = IMAGES.lock().unwrap();
     let Some(image) = images.get_mut(&id) else {
-        let e: Box<dyn std::error::Error> = format!("Bad ID").into();
-        return Err(Error::Std(e));
+        return Err(Error::Std(Box::<dyn std::error::Error>::from(format!("Bad ID"))));
     };
     func(image).map_err(|e| Error::from(e))
 }
