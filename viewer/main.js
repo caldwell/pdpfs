@@ -375,7 +375,14 @@ app.on('menu:file/rename', async (event) => {
 const shortcut = (key)      => process.platform == 'darwin' ? `Cmd+${key}` : `Ctrl+${key}`;
 const mac      = (...items) => process.platform == 'darwin' ? items : [];
 const non_mac  = (...items) => process.platform != 'darwin' ? items : [];
-const emitter  = (name) => (event) => app.emit(name, event);
+const menu_emit = (menu_item) => {
+    let event = `menu:${menu_item.id}`;
+    if (curr_win()?.emit(event, menu_item) == true)
+        return;
+    if (app.emit(event, menu_item) == true)
+        return;
+    curr_window()?.send(event);
+}
 
 const __need = {};
 const extract_needs = (template) => {
@@ -410,18 +417,18 @@ const menu = new Menu.buildFromTemplate(
         { label: 'File',
           submenu: [
               { beforeGroupContaining: ['Quit'],
-                label: 'New Disk Image…',     click: emitter('menu:file/new'),                   accelerator: shortcut('N') },
-              { label: 'Open Disk Image…',    click: emitter('menu:file/open'),                  accelerator: shortcut('O') },
+                label: 'New Disk Image…',     id: 'file/new',     click: menu_emit,               accelerator: shortcut('N') },
+              { label: 'Open Disk Image…',    id: 'file/open',    click: menu_emit,               accelerator: shortcut('O') },
               { role: 'recentDocuments' },
               { type: 'separator' },
-              { role: 'close',                click: emitter('menu:file/close') },
-              { label: 'Save Disk Image',     click: emitter('menu:file/save'),    need:["img"], accelerator: shortcut('S') },
-              { label: 'Save Disk Image As…', click: emitter('menu:file/save-as'), need:["img"] },
+              { role: 'close',                id: 'file/close',   click: menu_emit },
+              { label: 'Save Disk Image',     id: 'file/save',    click: menu_emit, need:["img"], accelerator: shortcut('S') },
+              { label: 'Save Disk Image As…', id: 'file/save-as', click: menu_emit, need:["img"] },
               { type: 'separator' },
-              { label: 'Export Files…',       click: emitter('menu:file/export'),  need:["sel"] },
-              { label: 'Import Files…',       click: emitter('menu:file/import'),  need:["img"] },
-              { label: 'Delete',              click: emitter('menu:file/delete'),  need:["sel"], accelerator: shortcut('Backspace')},
-              { label: 'Rename',              click: emitter('menu:file/rename'),  need:["one_sel"] },
+              { label: 'Export Files…',       id: 'file/export',  click: menu_emit, need:["sel"] },
+              { label: 'Import Files…',       id: 'file/import',  click: menu_emit, need:["img"] },
+              { label: 'Delete',              id: 'file/delete',  click: menu_emit, need:["sel"], accelerator: shortcut('Backspace')},
+              { label: 'Rename',              id: 'file/rename',  click: menu_emit, need:["one_sel"] },
               ...non_mac({ type: 'separator' },
                          { role: 'quit' }),
           ],
