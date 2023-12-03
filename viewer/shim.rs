@@ -172,7 +172,7 @@ fn convert(mut cx: FunctionContext) -> JsResult<JsNull> {
     with_image_id(id, |image| {
         pdpfs::ops::convert(image.fs.block_device(), image_type, &file)
             .map_err(|e| format!("Couldn't save {}: {}", file.display(), e))
-            .and_then(|_| { image.dirty = true; Ok(()) })
+            .and_then(|_| { Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())
 }
