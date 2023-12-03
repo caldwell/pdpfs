@@ -426,6 +426,8 @@ const menu = new Menu.buildFromTemplate(
 );
 Menu.setApplicationMenu(menu);
 
+update_menus([], false, false);
+
 app.whenReady().then(() => {
     open_image_dialog();
 })
