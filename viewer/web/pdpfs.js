@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { createRoot } from 'react-dom/client'
 import { jsr } from '@caldwell/jsml/jsml-react.mjs'
-import { DndProvider, useDrag, useDrop } from 'react-dnd'
+import { DndProvider, useDrop } from 'react-dnd'
 import { HTML5Backend, NativeTypes } from 'react-dnd-html5-backend'
 
 import './pdpfs.css'
@@ -56,10 +56,10 @@ function app() {
     const image_id = to_num(location.searchParams.get("id"));
     const new_image = location.searchParams.get('kind')=='new';
 
-    return jsr(new_image ? [new_image_setup] : [diskimageview, { image_id: image_id }]);
+    return jsr(new_image ? [NewImageSetup] : [DiskImageView, { image_id: image_id }]);
 }
 
-function diskimageview({image_id}) {
+function DiskImageView({image_id}) {
     const [entries, set_entries] = React.useState([]);
     const [error, set_error] = React.useState(null);
 
@@ -76,13 +76,13 @@ function diskimageview({image_id}) {
         };
         window.addEventListener("pdpfs:refresh-directory-entries", handler);
         return () => { cancelled=true; window.removeEventListener("pdpfs:refresh-directory-entries", handler) };
-    }, [image_id]);
+    }, [image_id, clear_selection]);
 
     // This drop stuff halfway works on tauri: it lets us do the hovering stuff, but the drop part doesn't
     // work. On electron, the drop _does_ work.
     const [{hovering}, drop] = useDrop(() => ({
         accept: NativeTypes.FILE,
-        drop: (drop_obj, monitor) => {
+        drop: (drop_obj, _monitor) => {
             for (let file of drop_obj.files)
                 try {
                     pdpfs.cp_into_image(file.path)
@@ -100,7 +100,7 @@ function diskimageview({image_id}) {
     hover_ref.current = hovering;
 
     if (listen) { // Tauri has a separate app level listen event for system drag and drops
-        React.useEffect(() => {
+        React.useEffect(() => { // eslint-disable-line react-hooks/rules-of-hooks
             let canceled = false;
             listen('tauri://file-drop', async event => {
                 if (canceled) return;
@@ -132,7 +132,7 @@ function diskimageview({image_id}) {
         }
     };
     React.useEffect(() => {
-        let handler = (event) => { let f = selected_values()[0]; if (f) set_editing(f) };
+        let handler = (_event) => { let f = selected_values()[0]; if (f) set_editing(f) };
         window.addEventListener("menu:file/rename", handler);
         return () => { window.removeEventListener("menu:file/rename", handler) };
     }, [set_editing, selected_values]);
@@ -146,7 +146,7 @@ function diskimageview({image_id}) {
                 ['div', { className: 'body' },
                  make_selectable(sorted.map((e) => ({ value: e.name,
                                                       el: ['div', { draggable: true, className: `direntry` },
-                                                           { onDragStart: prevent_default((event) => {
+                                                           { onDragStart: prevent_default((_event) => {
                                                                return pdpfs.start_drag()
                                                            })},
                                                            ['div', { className: 'icon' }, [svg, { icon: "file" }]],
@@ -185,7 +185,7 @@ function useSelection(on_change) {
     const set_selection = React.useCallback(f => {
         return _set_selection(current => {
             let new_selection = f(current);
-            on_change(values.current.filter((v,i) => find_span(new_selection, i) != undefined));
+            on_change(values.current.filter((_v,i) => find_span(new_selection, i) != undefined));
             return new_selection;
         })
     }, [on_change, values, _set_selection, find_span]);
@@ -232,7 +232,7 @@ function useSelection(on_change) {
             let newsel = [...current];
             if (newsel.length == 0)
                 return [{ start: 0, end: i, anchor: 0 }];
-            let {start, end, anchor} = newsel.pop();
+            let {anchor} = newsel.pop();
             newsel.push({ start: Math.min(i,anchor), end: Math.max(i,anchor), anchor: anchor });
             return coalesce_selection_spans(newsel);
         })
@@ -241,8 +241,8 @@ function useSelection(on_change) {
     const mouse_state = React.useRef(false);
 
     return {
-        selected_values: React.useCallback(() => values.current.filter((v, i) => is_selected(i)), [values, is_selected]),
-        clear_selection: React.useCallback(() => set_selection(current => []), [set_selection]),
+        selected_values: React.useCallback(() => values.current.filter((_v, i) => is_selected(i)), [values, is_selected]),
+        clear_selection: React.useCallback(() => set_selection(_current => []), [set_selection]),
         make_selectable: (items) => {
             values.current = items.map((item) => item.value);
             let els = items.map((item) => item.el);
@@ -262,27 +262,27 @@ function useSelection(on_change) {
                                                     mouse_state.current = "selecting-discontiguous";
                                                 } else if (event.shiftKey) {
                                                     set_last_selection_end(i);
-                                                    mouse_state.current = "selecting";;
+                                                    mouse_state.current = "selecting";
                                                 } else {
                                                     if (is_selected(i))
                                                         mouse_state.current = "clicked-on-selection";
                                                     else {
-                                                        set_selection(current => [{ start: i, end: i, anchor: i }]);
+                                                        set_selection(_current => [{ start: i, end: i, anchor: i }]);
                                                         mouse_state.current = "selecting"
-                                                    };
+                                                    }
                                                 }
                                                 if (mouse_state.current.startsWith("selecting"))
                                                     prevent_default()(event);
                                             },
-                                            onMouseMove: (event) => {
+                                            onMouseMove: (_event) => {
                                                 if (mouse_state.current == "selecting")
                                                     set_last_selection_end(i);
                                                 if (mouse_state.current == "selecting-discontiguous")
                                                     set_selected(i);
                                             },
-                                            onMouseUp: (event) => {
+                                            onMouseUp: (_event) => {
                                                 if (mouse_state.current == "clicked-on-selection") {
-                                                    set_selection(current => [{ start: i, end: i, anchor: i }]);
+                                                    set_selection(_current => [{ start: i, end: i, anchor: i }]);
                                                 }
                                                 mouse_state.current = undefined
                                             },
@@ -294,7 +294,7 @@ function useSelection(on_change) {
 
 function from_human(s) {
     let m;
-    if (m = s.match(/^\s*([\d.]+)\s*([kmgtey])?b?\s*$/i)) {
+    if ((m = s.match(/^\s*([\d.]+)\s*([kmgtey])?b?\s*$/i))) {
         let unit = m[2] == undefined ? 0 : "bkmgtey".search(m[2].toLowerCase());
         if (unit == -1) return undefined;
         return Number(m[1]) * 1024 ** unit;
@@ -308,7 +308,7 @@ function human(v) {
 
 const device_type_size = Object.fromEntries(pdpfs.device_types.map(dtype => [dtype.name, dtype.bytes]));
 
-function new_image_setup({}) {
+function NewImageSetup() {
     const [image_type,  set_image_type]  = React.useState("img");
     const [device_type, set_device_type] = React.useState("rx01");
     const [image_size,  set_image_size]  = React.useState("1MB");
