@@ -1,8 +1,14 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
+import { URL } from 'node:url';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import fs from 'node:fs';
+
+// CommonJS backwards compat
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const require = createRequire(import.meta.url);
 const { app, BrowserWindow, Menu, MenuItem, ipcMain, dialog } = require('electron');
-const path = require('node:path');
-const fs = require('node:fs');
 const pdpfs = require(__dirname);
 
 class Image {

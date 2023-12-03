@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "",
   "main": "index.node",
+  "type": "module",
   "scripts": {
     "build": "npm run build-rs && npm run build-web",
     "build-rs": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics",
