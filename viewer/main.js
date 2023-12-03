@@ -104,6 +104,7 @@ class ImageWindow {
         win.webContents.ipc.handle('pdpfs:cp_into_image',         modifies((event, path) => this.image.cp_into_image(path)));
         win.webContents.ipc.handle('pdpfs:save',                  modifies((event)       => this.image.save()));
         win.on('menu:file/save', async (event) => await this.save());
+        win.on('menu:file/save-as', async (event) => await this.save_as());
     }
 
     send(type, detail) {
@@ -235,6 +236,25 @@ class ImageWindow {
             return;
         }
     }
+
+    async save_as() {
+        let { canceled, filePath, bookmark } = await dialog.showSaveDialog(this.window, {
+            title: "Save this disk image as:",
+            defaultPath: "Disk Image.img",
+            filters: [ { name: "IMG", extensions: [".img"] },
+                       { name: "IMD", extensions: [".imd"] },],
+            message: "Above the text fields we dream",
+            properties: ['createDirectory', 'showOverwriteConfirmation'],
+        });
+        if (canceled) return;
+        try {
+            await this.image.convert(filePath, path.extname(filePath).slice(1));
+        } catch(e) {
+            await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
+            return;
+        }
+        this.update_edited();
+    }
 }
 
 class NewImageWindow {
@@ -328,28 +348,6 @@ app.on('menu:file/new', (event) => {
 });
 app.on('menu:file/open', (event) => {
     open_image_dialog();
-})
-
-app.on('menu:file/save-as', async (event) => {
-    with_curr_window(async (w) => {
-        let { canceled, filePath, bookmark } = await dialog.showSaveDialog(w.window, {
-            title: "Save this disk image as:",
-            defaultPath: "Disk Image.img",
-            filters: [ { name: "IMG", extensions: [".img"] },
-                       { name: "IMD", extensions: [".imd"] },],
-            message: "Above the text fields we dream",
-            properties: ['createDirectory', 'showOverwriteConfirmation'],
-        });
-        if (canceled) return;
-        try {
-            await w.image.convert(filePath, path.extname(filePath).slice(1));
-        } catch(e) {
-            await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
-            return;
-        }
-        console.log(canceled, filePath, bookmark);
-        w.update_edited();
-    })
 })
 
 app.on('menu:file/delete', async (event) => {
