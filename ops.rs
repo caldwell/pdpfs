@@ -76,7 +76,7 @@ pub fn open_device(image_file: &Path) -> anyhow::Result<Box<dyn BlockDevice>> {
     let image = std::fs::read(image_file)?;
     Ok(match (&image[0..3], image.len()) {
         (magic, _) if magic == "IMD".as_bytes() => {
-            let imd = IMD::from_bytes(&image)?;
+            let imd = IMD::from_bytes(&image).with_context(|| "Malformed IMD file")?;
             match imd.total_bytes() {
                 bytes if bytes < 1024*1024 => Box::new(RX(imd)),
                 _                          => Box::new(Flat(imd))

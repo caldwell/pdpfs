@@ -60,7 +60,7 @@ impl IMD {
 
         let mut tracks: Vec<Track> = vec![];
         while buf.get_rpos() < buf.len() {
-            tracks.push(Track::from_repr(&mut buf).with_context(|| format!("Track {}", tracks.len()))?);
+            tracks.push(Track::from_repr(&mut buf).with_context(|| format!("Couldn't parse Track {}", tracks.len()))?);
         }
 
         Ok(IMD {

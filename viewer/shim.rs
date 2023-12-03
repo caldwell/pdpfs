@@ -57,12 +57,18 @@ fn with_image_id<T,E,F>(id: u32, func: F) -> Result<T,Error>
     func(image).map_err(|e| Error::from(e))
 }
 
+fn nice_err(err: anyhow::Error) -> String {
+    let mut s = format!("{}\n", err);
+    err.chain().skip(1).for_each(|cause| s.push_str(&format!("because: {}\n", cause)));
+    s
+}
+
 fn open_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
     js_args!(&mut cx, image_file: PathBuf);
 
     let fs = pdpfs::ops::open_fs(pdpfs::ops::open_device(&Path::new(&image_file))
-        .map_err(|e| format!("Bad or unknown disk image file format.\nDetails: {}", e)).into_jserr(&mut cx)?)
-        .map_err(|e| format!("Bad or unknown format on disk image.\nDetails: {}", e)).into_jserr(&mut cx)?;
+        .map_err(|e| format!("Bad or unknown disk image file format.\nDetails: {}", nice_err(e))).into_jserr(&mut cx)?)
+        .map_err(|e| format!("Bad or unknown format on disk image.\nDetails: {}", nice_err(e))).into_jserr(&mut cx)?;
 
     let id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
