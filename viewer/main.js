@@ -245,15 +245,18 @@ class ImageWindow {
         try {
             if (!save) {
                 await this.image.convert(filePath, path.extname(filePath).slice(1));
+                let converted = new Image({image_path: filePath});
+                this.image.close();
+                this.image = converted;
             } else {
                 this.image.path = filePath;
-                this.setup_titlebar();
                 this.image.save();
             }
         } catch(e) {
             await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
             return;
         }
+        this.setup_titlebar();
         this.update_edited();
     }
 }
