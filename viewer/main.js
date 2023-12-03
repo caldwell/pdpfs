@@ -219,37 +219,37 @@ class ImageWindow {
     }
 
     async save() {
+        if (!this.image.path)
+            return this.save_as({save: true});
         try {
-            if (!this.image.path) {
-                let { canceled, filePath, bookmark } = await dialog.showSaveDialog(this.window, {
-                    title: "Save this disk image:",
-                    defaultPath: "Disk Image.img",
-                    properties: ['createDirectory', 'showOverwriteConfirmation'],
-                });
-                if (canceled) return;
-                this.image.path = filePath;
-                this.setup_titlebar();
-            }
             this.image.save();
             this.update_edited();
         } catch(e) {
-            await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
+            await dialog.showErrorBox(`Could not save ${path.basename(this,image.path)}:`, e.toString());
             return;
         }
     }
 
-    async save_as() {
+    async save_as({save}={}) {
         let { canceled, filePath, bookmark } = await dialog.showSaveDialog(this.window, {
-            title: "Save this disk image as:",
+            title: `Save this disk image${!save ? ' as' : ''}:`,
             defaultPath: "Disk Image.img",
-            filters: [ { name: "IMG", extensions: [".img"] },
-                       { name: "IMD", extensions: [".imd"] },],
+            ...(save ? {} : {
+                filters: [ { name: "IMG", extensions: [".img"] },
+                           { name: "IMD", extensions: [".imd"] },],
+            }),
             message: "Above the text fields we dream",
             properties: ['createDirectory', 'showOverwriteConfirmation'],
         });
         if (canceled) return;
         try {
-            await this.image.convert(filePath, path.extname(filePath).slice(1));
+            if (!save) {
+                await this.image.convert(filePath, path.extname(filePath).slice(1));
+            } else {
+                this.image.path = filePath;
+                this.setup_titlebar();
+                this.image.save();
+            }
         } catch(e) {
             await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
             return;
