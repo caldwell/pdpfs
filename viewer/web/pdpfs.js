@@ -173,9 +173,6 @@ function diskimageview({image_id}) {
 
 function useSelection(on_change) {
     let values;
-    function selected_values() {
-        return values.filter((v, i) => is_selected(v))
-    }
 
     const [selection, _set_selection] = React.useState([]);
     function set_selection(f) {
