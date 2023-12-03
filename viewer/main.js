@@ -113,7 +113,7 @@ class ImageWindow {
     };
 
     async close(event) {
-        if (!await pdpfs.image_is_dirty(this.image.id))
+        if (!await this.image.image_is_dirty())
             return;
         event.preventDefault();
 
