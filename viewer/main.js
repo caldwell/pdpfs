@@ -103,6 +103,7 @@ class ImageWindow {
         win.webContents.ipc.handle('pdpfs:image_is_dirty',                 (event)       => this.image.image_is_dirty());
         win.webContents.ipc.handle('pdpfs:cp_into_image',         modifies((event, path) => this.image.cp_into_image(path)));
         win.webContents.ipc.handle('pdpfs:save',                  modifies((event)       => this.image.save()));
+        win.on('menu:file/save', async (event) => await this.save());
     }
 
     send(type, detail) {
@@ -225,11 +226,10 @@ class ImageWindow {
                 });
                 if (canceled) return;
                 this.image.path = filePath;
-                console.log(canceled, filePath, bookmark);
-                this.update_edited();
                 this.setup_titlebar();
             }
             this.image.save();
+            this.update_edited();
         } catch(e) {
             await dialog.showErrorBox(`Could not save ${path.basename(filePath)}:`, e.toString());
             return;
@@ -328,13 +328,6 @@ app.on('menu:file/new', (event) => {
 });
 app.on('menu:file/open', (event) => {
     open_image_dialog();
-})
-
-app.on('menu:file/save', async (event) => {
-    with_curr_window(async (w) => {
-        await w.save();
-        w.update_edited();
-    })
 })
 
 app.on('menu:file/save-as', async (event) => {
