@@ -133,8 +133,8 @@ function diskimageview({image_id}) {
     };
     React.useEffect(() => {
         let handler = (event) => { let f = selected_values()[0]; if (f) set_editing(f) };
-        window.addEventListener("pdpfs:rename", handler);
-        return () => { window.removeEventListener("pdpfs:rename", handler) };
+        window.addEventListener("menu:file/rename", handler);
+        return () => { window.removeEventListener("menu:file/rename", handler) };
     }, [set_editing, selected_values]);
 
     return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
