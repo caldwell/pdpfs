@@ -132,10 +132,10 @@ function diskimageview({image_id}) {
         }
     };
     React.useEffect(() => {
-        let handler = (event) => set_editing(event.detail);
+        let handler = (event) => { let f = selected_values()[0]; if (f) set_editing(f) };
         window.addEventListener("pdpfs:rename", handler);
         return () => { window.removeEventListener("pdpfs:rename", handler) };
-    }, [set_editing]);
+    }, [set_editing, selected_values]);
 
     return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
                 ['div', { className: 'header' },
@@ -172,13 +172,13 @@ function diskimageview({image_id}) {
 }
 
 function useSelection(on_change) {
-    let values;
+    let values = React.useRef();
 
     const [selection, _set_selection] = React.useState([]);
     function set_selection(f) {
         return _set_selection(current => {
             let new_selection = f(current);
-            on_change(values.filter((v,i) => find_span(new_selection, i) != undefined));
+            on_change(values.current.filter((v,i) => find_span(new_selection, i) != undefined));
             return new_selection;
         })
     }
@@ -238,10 +238,10 @@ function useSelection(on_change) {
     const mouse_state = React.useRef(false);
 
     return {
-        selected_values: () => values.filter((v, i) => is_selected(v)),
+        selected_values: () => values.current.filter((v, i) => is_selected(i)),
         clear_selection: () => set_selection(current => []),
         make_selectable: (items) => {
-            values = items.map((item) => item.value);
+            values.current = items.map((item) => item.value);
             let els = items.map((item) => item.el);
             return jsr([React.Fragment,
                         ...els.map((el,i) => {
