@@ -19,6 +19,7 @@ use pdpfs::block::BlockDevice;
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("open_image", open_image)?;
     cx.export_function("create_image", create_image)?;
+    cx.export_function("close_image", close_image)?;
     cx.export_function("image_is_dirty", image_is_dirty)?;
     cx.export_function("get_directory_entries", get_directory_entries)?;
     cx.export_function("cp_from_image", cp_from_image)?;
@@ -92,6 +93,15 @@ fn create_image(mut cx: FunctionContext) -> JsResult<JsNumber> {
     IMAGES.lock().unwrap().insert(id, Image { fs, dirty: false });
 
     Ok(cx.number(id))
+}
+
+fn close_image(mut cx: FunctionContext) -> JsResult<JsNull> {
+    js_args!(&mut cx, id: u32);
+    let mut images = IMAGES.lock().unwrap();
+    if images.remove(&id).is_none() {
+        return Err(format!("Bad ID")).into_jserr(&mut cx);
+    };
+    Ok(cx.null())
 }
 
 fn image_is_dirty(mut cx: FunctionContext) -> JsResult<JsBoolean> {
