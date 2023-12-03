@@ -127,7 +127,8 @@ class ImageWindow {
             normalizeAccessKeys: true,
         });
 
-        // We already prevented default so Cancel is handled.
+        if (response == 0) // Cancel
+            cancel_the_quit(); // In case this was invoked by File/Quit
         if (response == 1) // Discard
             this.window.destroy();
         if (response == 2) { // Save
@@ -432,12 +433,20 @@ app.whenReady().then(() => {
     open_image_dialog();
 })
 
+let trying_to_quit; // Starting next week
+app.on('before-quit', () => {
+    trying_to_quit = true;
+})
+
+function cancel_the_quit() {
+    trying_to_quit = false;
+}
+
 app.on('window-all-closed', () => {
-    // if (process.platform !== 'darwin')
+    if (process.platform !== 'darwin' || trying_to_quit)
       app.quit()
 })
 
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) open_image_dialog();
 })
-
