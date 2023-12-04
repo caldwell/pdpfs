@@ -66,6 +66,7 @@ class ImageWindow {
         if (image) {
             this.create_temp_path();
             this.create_window();
+            this.add_to_recent();
         } else
             this.create_new_window();
     }
@@ -160,6 +161,13 @@ class ImageWindow {
 
     update_menus() {
         update_menus(this.selected, true, this.image.image_is_dirty());
+    }
+
+    add_to_recent() {
+        if (this.image.path && this.added_to_recent != this.image.path) {
+            app.addRecentDocument(this.image.path)
+            this.added_to_recent = this.image.path;
+        }
     }
 
     focus(event) {
@@ -268,6 +276,7 @@ class ImageWindow {
         }
         this.setup_titlebar();
         this.update_edited();
+        this.add_to_recent();
     }
 
     async import_files() {
@@ -517,7 +526,12 @@ const menu = new Menu.buildFromTemplate(
               { beforeGroupContaining: ['Quit'],
                 label: 'New Disk Image…',     id: 'file/new',     click: menu_emit,               accelerator: shortcut('N') },
               { label: 'Open Disk Image…',    id: 'file/open',    click: menu_emit,               accelerator: shortcut('O') },
-              { role: 'recentDocuments' },
+              // This just doesn't work at all. I'm blaming electron.
+              // { role: 'recentdocuments', "label":"Open Recent",
+              //   submenu:[
+              //       { "role":'clearrecentdocuments',  "label":"Clear Recent", }
+              //   ],
+              // },
               { type: 'separator' },
               { role: 'close',                id: 'file/close',   click: menu_emit },
               { label: 'Save Disk Image',     id: 'file/save',    click: menu_emit, need:["dirty"], accelerator: shortcut('S') },
@@ -541,11 +555,11 @@ const menu = new Menu.buildFromTemplate(
         },
     ])
 );
-Menu.setApplicationMenu(menu);
-
-update_menus([], false, false);
 
 app.whenReady().then(() => {
+    Menu.setApplicationMenu(menu);
+    update_menus([], false, false);
+
     open_image_dialog();
 })
 
