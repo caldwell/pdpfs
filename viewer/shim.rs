@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use neon::prelude::*;
 
 use make_neon_usable::*;
-use pdpfs::fs::{FileSystem, Timestamp};
+use pdpfs::fs::FileSystem;
 use pdpfs::block::BlockDevice;
 
 #[neon::main]
@@ -117,18 +117,8 @@ fn get_directory_entries(mut cx: FunctionContext) -> JsResult<JsArray> {
     let entries = with_image_id(id, |image| {
         image.fs.read_dir("/")
           .map_err(|err| cx.throw_error::<_,()>(format!("{}", err)).unwrap_err())?
-          .map(|e| -> JsResult<JsValue> {
-            let obj = cx.empty_object();
-            obj_set_bool(&mut cx, &obj, "read_only", e.readonly())?;
-            obj_set_string(&mut cx, &obj, "name", &e.file_name())?;
-            obj_set_number(&mut cx, &obj, "length", e.len() as u32)?;
-            match e.created() {
-                Ok(Timestamp::Date(d))      => obj_set_string(&mut cx, &obj, "creation_date", &format!("{}", d))?,
-                Ok(Timestamp::DateTime(dt)) => obj_set_string(&mut cx, &obj, "creation_date", &format!("{}", dt))?,
-                Err(_) => obj_set_null(&mut cx, &obj, "creation_date")?,
-            }
-            Ok(obj.upcast())
-        }).collect::<NeonResult<Vec<Handle<JsValue>>>>().into()
+          .map(|e| e.to(&mut cx))
+          .collect::<NeonResult<Vec<Handle<JsObject>>>>().into()
     }).into_jserr(&mut cx)?;
     vec_to_array(&mut cx, &entries)
 }

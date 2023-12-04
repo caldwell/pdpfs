@@ -177,6 +177,13 @@ impl<'a,'b> ToJs<'a,'b> for Handle<'a,JsValue> {
     }
 }
 
+impl<'a,'b> ToJs<'a,'b> for Handle<'a,JsObject> {
+    type Output=JsValue;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        Ok(self.as_value(cx))
+    }
+}
+
 impl<'a,'b> ToJs<'a,'b> for Box<dyn DirEntry + 'b> {
     type Output=JsObject;
     fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
