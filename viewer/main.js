@@ -107,9 +107,9 @@ class ImageWindow {
         win.webContents.ipc.handle('pdpfs:save',                  modifies((event)       => this.image.save()));
         win.on('menu:file/save', async (event) => await this.save());
         win.on('menu:file/save-as', async (event) => await this.save_as());
-        win.on('menu:file/delete', (event) => this.rm_selected());
+        win.on('menu:file/delete', (event) => this.rm(...this.selected));
         win.on('menu:file/import', async (event) => await this.import_files());
-        win.on('menu:file/export', async (event) => await this.export_selected());
+        win.on('menu:file/export', async (event) => await this.export_files(this.selected));
     }
 
     send(type, detail) {
@@ -225,10 +225,6 @@ class ImageWindow {
         this.update_entries();
     }
 
-    rm_selected() {
-        this.rm(...this.selected)
-    }
-
     rm(...files) {
         for (let file of files)
             this.image.rm(file);
@@ -333,7 +329,7 @@ class ImageWindow {
         this.update_entries();
     }
 
-    async export_selected() {
+    async export_files(files) {
         if (this.selected.length == 0) return await dialog.showErrorBox('Nothing to export. Select some files first.');
 
         try {
@@ -345,8 +341,7 @@ class ImageWindow {
             if (canceled) return;
             fs.mkdirSync(filePaths[0], { recursive: true });
 
-            let to_export = this.selected;
-            let stats = to_export.map(f => {
+            let stats = files.map(f => {
                 try { return { file: f, is_file: fs.statSync(path.join(filePaths[0], f)).isFile() } }
                 catch(_e) { return { file: f } }
             });
@@ -369,11 +364,11 @@ class ImageWindow {
                 if (response == 1) // Overwrite
                     ;// Don't need to do anything, we overwrite by default :-)
                 if (response == 2) // Don't overwrite
-                    to_export = stats.filter(e => e.is_file == undefined).map(e => e.file);
+                    files = stats.filter(e => e.is_file == undefined).map(e => e.file);
             }
 
             let failed = [];
-            for (let f of to_export)
+            for (let f of files)
                 try {
                     this.image.cp_from_image(f, filePaths[0]);
                 } catch(e) {
