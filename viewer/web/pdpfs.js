@@ -148,7 +148,9 @@ function DiskImageView({image_id}) {
                                                       el: ['div', { draggable: true, className: `direntry` },
                                                            { onDragStart: prevent_default((_event) => {
                                                                return pdpfs.start_drag()
-                                                           })},
+                                                           }),
+                                                             onContextMenu: prevent_default((event) => pdpfs.context_menu(selected_values())),
+                                                           },
                                                            ['div', { className: 'icon' }, [svg, { icon: "file" }]],
                                                            ['div', { className: 'filename' },
                                                             editing != e.name ? ['span', e.name,
@@ -254,6 +256,12 @@ function useSelection(on_change) {
                             if (odso && is_selected(i)) {
                                 let old_on_drag_start = odso.onDragStart;
                                 odso.onDragStart = (event) => { if (mouse_state.current != "selecting") old_on_drag_start(event) }
+                            }
+                            let ocmo = el.find(v => typeof(v) == 'object' && v.onContextMenu);
+                            if (ocmo) {
+                                let old_on_context_menu = ocmo.onContextMenu;
+                                // Context menu does an onMouseDown but never onMouseUps so we need to manually clear our state
+                                ocmo.onContextMenu = (event) => { mouse_state.current = undefined; old_on_context_menu(event) }
                             }
                             return ([ ...el, {
                                             onMouseDown: (event) => {

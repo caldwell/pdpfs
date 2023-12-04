@@ -98,6 +98,7 @@ class ImageWindow {
         win.on('closed', (event) => this.closed(event))
         win.on('focus', (event) => this.focus(event));
         win.webContents.ipc.on('app:set_selected', (event, selected) => this.set_selected(selected));
+        win.webContents.ipc.on('app:context_menu', (event, selected) => this.context_menu(selected));
         win.webContents.ipc.on('ondragstart', (event) => this.drag_start());
         win.webContents.ipc.handle('pdpfs:rm', (event, ...files) => this.rm(...files));
         win.webContents.ipc.handle('pdpfs:mv', (event, src, dest) => this.mv(src, dest));
@@ -385,6 +386,18 @@ class ImageWindow {
         } catch(e) {
             await dialog.showErrorBox("Exporting failed", e.toString());
         }
+    }
+
+    context_menu(files) {
+        if (files.length == 0) return;
+        const one = (...items) => files.length == 1 ? items : [];
+        const Files = files.length == 1 ? "File" : "Files";
+        const menu = new Menu.buildFromTemplate([
+            { label: `Export ${Files}…`, click: () => this.export_files(files) },
+            ...one({ label: "Rename File", click: () => this.send('menu:file/rename', files[0]) } ),
+            { label: `Delete ${Files}`, click: () => this.rm(...files) },
+        ])
+        menu.popup({window: this.window})
     }
 }
 
