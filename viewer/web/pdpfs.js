@@ -63,7 +63,7 @@ function DiskImageView({image_id}) {
     const [entries, set_entries] = React.useState([]);
     const [error, set_error] = React.useState(null);
 
-    let { selected_values, make_selectable, clear_selection } = useSelection(new_selection => pdpfs.set_selected(new_selection));
+    let { selected_values, make_selectable, clear_selection } = useSelection(React.useCallback(new_selection => pdpfs.set_selected(new_selection),[]));
 
     React.useEffect(() => {
         let cancelled;
