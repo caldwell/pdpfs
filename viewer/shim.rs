@@ -22,6 +22,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("close_image", close_image)?;
     cx.export_function("image_is_dirty", image_is_dirty)?;
     cx.export_function("get_directory_entries", get_directory_entries)?;
+    cx.export_function("stat", stat)?;
     cx.export_function("cp_from_image", cp_from_image)?;
     cx.export_function("cp_into_image", cp_into_image)?;
     cx.export_function("mv", mv)?;
@@ -130,6 +131,13 @@ fn get_directory_entries(mut cx: FunctionContext) -> JsResult<JsArray> {
         }).collect::<NeonResult<Vec<Handle<JsValue>>>>().into()
     }).into_jserr(&mut cx)?;
     vec_to_array(&mut cx, &entries)
+}
+
+fn stat<'a,'b>(mut cx: FunctionContext<'a>) -> JsResult<'a, JsValue> {
+    js_args!(&mut cx, id: u32, filename: String);
+    with_image_id(id, |image: & mut Image| -> JsResult<'a, JsValue> {
+        image.fs.stat(&filename).to(&mut cx)
+    }).into_jserr(&mut cx)
 }
 
 fn cp_from_image(mut cx: FunctionContext) -> JsResult<JsNull> {

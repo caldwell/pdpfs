@@ -1,6 +1,7 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
 use neon::prelude::*;
+use pdpfs::fs::{DirEntry, Timestamp};
 
 use std::{fmt::{Debug, Display}, path::{PathBuf, Path}, convert::TryFrom};
 
@@ -173,6 +174,22 @@ impl<'a,'b> ToJs<'a,'b> for Handle<'a,JsValue> {
     type Output=JsValue;
     fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
         Ok(self.as_value(cx))
+    }
+}
+
+impl<'a,'b> ToJs<'a,'b> for Box<dyn DirEntry + 'b> {
+    type Output=JsObject;
+    fn to(&'b self, cx: &mut FunctionContext<'a>) -> NeonResult<Handle<'a,Self::Output>> {
+        let obj = cx.empty_object();
+        obj_set_bool(cx, &obj, "read_only", self.readonly())?;
+        obj_set_string(cx, &obj, "name", &self.file_name())?;
+        obj_set_number(cx, &obj, "length", self.len() as u32)?;
+        match self.created() {
+            Ok(Timestamp::Date(d))      => obj_set_string(cx, &obj, "creation_date", &format!("{}", d))?,
+            Ok(Timestamp::DateTime(dt)) => obj_set_string(cx, &obj, "creation_date", &format!("{}", dt))?,
+            Err(_) => obj_set_null(cx, &obj, "creation_date")?,
+        }
+        Ok(obj)
     }
 }
 
