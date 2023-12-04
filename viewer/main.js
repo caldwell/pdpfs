@@ -33,6 +33,7 @@ class Image {
     }
 
     get_directory_entries()          { return pdpfs.get_directory_entries(this.id)            }
+    stat                 (file)      { return pdpfs.stat                 (this.id, file)      }
     cp_into_image        (path)      { return pdpfs.cp_into_image        (this.id, path)      }
     cp_from_image        (src, dest) { return pdpfs.cp_from_image        (this.id, src, dest) }
     image_is_dirty       ()          { return pdpfs.image_is_dirty       (this.id)            }
@@ -106,6 +107,8 @@ class ImageWindow {
         win.on('menu:file/save', async (event) => await this.save());
         win.on('menu:file/save-as', async (event) => await this.save_as());
         win.on('menu:file/delete', (event) => this.rm_selected());
+        win.on('menu:file/import', async (event) => await this.import_files());
+        win.on('menu:file/export', async (event) => await this.export_selected());
     }
 
     send(type, detail) {
@@ -265,6 +268,119 @@ class ImageWindow {
         }
         this.setup_titlebar();
         this.update_edited();
+    }
+
+    async import_files() {
+        let { canceled, filePaths, _bookmark } = await dialog.showOpenDialog(this.window, {
+            title: `Select the files to import.`,
+            buttonLabel: "Import",
+            properties: ['multiSelections', 'openFile', 'createDirectory', 'showOverwriteConfirmation', 'promptToCreate'],
+        });
+        if (canceled) return;
+
+        try {
+            // Can we check filenames up front?
+            let to_import = filePaths;
+            let existence = filePaths.map(f => ({ file: f, exists: this.image.stat(path.basename(f).toUpperCase()) != null }));
+            let existing_files = existence.filter(e => e.exists).map(e => e.file);
+            if (existing_files.length != 0) {
+                let { response } = await dialog.showMessageBox(this.window, {
+                    message: `The following items already exist in image:\n${existing_files.join("\n")}`,
+                    defails: "What are details like????",
+                    type: "question",
+                    buttons: ["&Cancel Import", "&Overwrite", "&Don't Overwrite"],
+                    defaultId: 2,
+                    normalizeAccessKeys: true,
+                });
+
+                if (response == 0) // Cancel
+                    return;
+                if (response == 1) // Overwrite
+                    ;// Don't need to do anything, we overwrite by default :-)
+                if (response == 2) // Don't overwrite
+                    to_import = existence.filter(e => !e.exists).map(e => e.file);
+            }
+
+
+            let failed = [];
+            for (let f of to_import)
+                try {
+                    this.image.cp_into_image(f, '.');
+                } catch(e) {
+                    failed.push({ file: f, error: e})
+                }
+            if (failed.length != 0)
+                dialog.showMessageBox(this.window, {
+                    message: `The following files failed to import:\n${failed.map(f=>f.file).join("\n")}\n`,
+                    type: "error",
+                    title: "Import Error",
+                    detail: 'The errors encountered were:\n' + failed.map(f=>`${path.basename(f.file).toUpperCase()}: ${f.error}\n`).join(''),
+                    textWidth: 600,
+                });
+        } catch(e) {
+            await dialog.showErrorBox("Importing failed", e.toString());
+        }
+        this.update_edited();
+        this.update_entries();
+    }
+
+    async export_selected() {
+        if (this.selected.length == 0) return await dialog.showErrorBox('Nothing to export. Select some files first.');
+
+        try {
+            let { canceled, filePaths, _bookmark } = await dialog.showOpenDialog(this.window, {
+                title: `Select the directory you wish to export the files to.`,
+                buttonLabel: "Export Here",
+                properties: ['openDirectory', 'createDirectory', 'showOverwriteConfirmation', 'promptToCreate'],
+            });
+            if (canceled) return;
+            fs.mkdirSync(filePaths[0], { recursive: true });
+
+            let to_export = this.selected;
+            let stats = to_export.map(f => {
+                try { return { file: f, is_file: fs.statSync(path.join(filePaths[0], f)).isFile() } }
+                catch(_e) { return { file: f } }
+            });
+            let existing_non_files = stats.filter(e => e.is_file == false).map(e => e.file);
+            if (existing_non_files.length != 0)
+                return dialog.showErrorBox("Can't export.", `The following items exist in the output directory but they are not files:\n${existing_non_files.join("\n")}`);
+            let existing_files = stats.filter(e => e.is_file == true).map(e => e.file);
+            if (existing_files.length != 0) {
+                let { response } = await dialog.showMessageBox(this.window, {
+                    message: `The following items exist in the output directory:\n${existing_files.join("\n")}`,
+                    defails: "What are details like????",
+                    type: "question",
+                    buttons: ["&Cancel Export", "&Overwrite", "&Don't Overwrite"],
+                    defaultId: 2,
+                    normalizeAccessKeys: true,
+                });
+
+                if (response == 0) // Cancel
+                    return;
+                if (response == 1) // Overwrite
+                    ;// Don't need to do anything, we overwrite by default :-)
+                if (response == 2) // Don't overwrite
+                    to_export = stats.filter(e => e.is_file == undefined).map(e => e.file);
+            }
+
+            let failed = [];
+            for (let f of to_export)
+                try {
+                    this.image.cp_from_image(f, filePaths[0]);
+                } catch(e) {
+                    failed.push({ file: f, error: e})
+                }
+            if (failed.length != 0)
+                dialog.showMessageBox(this.window, {
+                    message: `The following files failed to export:\n${failed.map(f=>f.file).join("\n")}\n`,
+                    type: "error",
+                    title: "Export Error",
+                    detail: 'The errors encountered were:\n' + failed.map(f=>`${f.file}: ${f.error}\n`).join(''),
+                    textWidth: 600,
+                });
+        } catch(e) {
+            await dialog.showErrorBox("Exporting failed", e.toString());
+        }
     }
 }
 
