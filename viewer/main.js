@@ -512,7 +512,7 @@ const extract_needs = (template) => {
 }
 
 const enable_menu_items = (need, enable) => {
-    for (let id of __need[need]) {
+    for (let id of __need[need] ?? []) {
         let menu = Menu.getApplicationMenu().getMenuItemById(id);
         menu.enabled = enable;
     }
