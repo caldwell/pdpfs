@@ -600,8 +600,8 @@ impl DirEntry {
     }
 
     pub fn encode_filename(name: &str) -> anyhow::Result<[u16; 3]> {
-        let Some((name, ext)) = name.split_once(".") else { return Err(anyhow!("{}: missing extension", name)) };
-        if name.len() > 6 || name.len() < 1 || ext.len() > 3 || ext.len() < 1 { return Err(anyhow!("{}: name should 1 to 6 chars, extention should be 1 to 3", name)) };
+        let Some((name, ext)) = name.split_once(".") else { return Err(anyhow!("filename missing extension")) };
+        if name.len() > 6 || name.len() < 1 || ext.len() > 3 || ext.len() < 1 { return Err(anyhow!("filename should 1 to 6 chars, extention should be 1 to 3")) };
         let name_w = radix50::pdp11::encode(&format!("{:<6}", name))?;
         let ext_w  = radix50::pdp11::encode_word(&format!("{:<3}", ext))?;
         Ok([name_w[0], name_w[1], ext_w])

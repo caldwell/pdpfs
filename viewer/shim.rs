@@ -144,7 +144,7 @@ fn cp_into_image(mut cx: FunctionContext) -> JsResult<JsNull> {
     js_args!(&mut cx, id: u32, path: PathBuf);
     with_image_id(id, |image| {
         pdpfs::ops::cp_into_image(&mut image.fs, &path, Path::new("."))
-            .map_err(|e| format!("Could't write {}: {}", path.display(), e))
+            .map_err(|e| format!("{}", nice_err(e)))
             .and_then(|_| { image.dirty = true; Ok(()) })
     }).into_jserr(&mut cx)?;
     Ok(cx.null())

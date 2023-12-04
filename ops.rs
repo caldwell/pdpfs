@@ -139,12 +139,12 @@ pub fn cp_from_image(fs: &impl FileSystem, src: &Path, dest: &Path) -> anyhow::R
 }
 
 pub fn cp_into_image(fs: &mut impl FileSystem, src: &Path, dest: &Path) -> anyhow::Result<()> {
-    let dest = match dest {
+    let dest = path_to_rt11_filename(match dest {
         d if d == Path::new(".") => Path::new(src.file_name().ok_or_else(|| anyhow!("Need source filename to use '.'"))?),
         d => d,
-    };
-    let buf = std::fs::read(src)?;
-    fs.write_file(&path_to_rt11_filename(dest)?, &buf)?;
+    })?;
+    let buf = std::fs::read(src).with_context(|| format!("Reading \"{}\" failed", src.display()))?;
+    fs.write_file(&dest, &buf).with_context(|| format!("Creating \"{}\" on disk image failed", dest))?;
     Ok(())
 }
 
