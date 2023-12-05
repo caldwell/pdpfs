@@ -63,7 +63,7 @@ function DiskImageView({image_id}) {
     const [entries, set_entries] = React.useState([]);
     const [error, set_error] = React.useState(null);
 
-    let { selected_values, make_selectable, clear_selection } = useSelection(React.useCallback(new_selection => pdpfs.set_selected(new_selection),[]));
+    let { selected_values, make_selectable, clear_selection, mouse_state } = useSelection(React.useCallback(new_selection => pdpfs.set_selected(new_selection),[]));
 
     React.useEffect(() => {
         let cancelled;
@@ -154,7 +154,9 @@ function DiskImageView({image_id}) {
                                                            ['div', { className: 'icon' }, [svg, { icon: "file" }]],
                                                            ['div', { className: 'filename' },
                                                             editing != e.name ? ['span', e.name,
-                                                                                 { onClick: () => { set_editing(e.name) } }]
+                                                                                 // Mimic macOS Finder: a click only renames if the file is already selected.
+                                                                                 { onClick: () => { if (mouse_state() == 'clicked-on-selection')
+                                                                                                        set_editing(e.name) } }]
                                                                               : ['input', { type: "text", size: 12, defaultValue: e.name, autoFocus: true },
                                                                                  { onFocus: (event) => event.target.select(),
                                                                                    onBlur: (event) => { rename(e.name, event.target.value) },
@@ -244,6 +246,7 @@ function useSelection(on_change) {
     return {
         selected_values: React.useCallback(() => values.current.filter((_v, i) => is_selected(i)), [values, is_selected]),
         clear_selection: React.useCallback(() => set_selection(_current => []), [set_selection]),
+        mouse_state:     React.useCallback(() => mouse_state.previous, []),
         make_selectable: (items) => {
             values.current = items.map((item) => item.value);
             let els = items.map((item) => item.el);
@@ -291,6 +294,7 @@ function useSelection(on_change) {
                                                 if (mouse_state.current == "clicked-on-selection") {
                                                     set_selection(_current => [{ start: i, end: i, anchor: i }]);
                                                 }
+                                                mouse_state.previous = mouse_state.current;
                                                 mouse_state.current = undefined
                                             },
                             }])
