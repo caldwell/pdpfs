@@ -11,7 +11,6 @@ import './pdpfs.css'
 const location=new URL(window.location.href);
 
 async function main() {
-    init_tauri();
     let [app_el] = ["pdpfs"].map(id => document.getElementById(id));
     let app_root = createRoot(app_el);
     app_root.render(jsr([DndProvider, {backend:HTML5Backend}, [app]]));
@@ -19,27 +18,6 @@ async function main() {
 }
 
 window.addEventListener("DOMContentLoaded", main);
-
-let emit, listen;
-async function init_tauri() {
-    if (!window.__TAURI__) return; // Not running under tauri!
-    const { invoke } = window.__TAURI__.primitives;
-    const appWindow = window.__TAURI__.window.getCurrent();
-    try {
-        ({ emit, listen } = await import('@tauri-apps/api/event'));
-    } catch(e) {
-        console.log("Shouldn't happen", e);
-    }
-
-    window.pdpfs = {
-        get_directory_entries: async function(image_id) {
-            return await invoke("get_directory_entries", { id: image_id });
-        },
-        cp_into_image: async function (image_id, path) {
-            await invoke("cp_into_image", { id: image_id, path: path });
-        }
-    };
-}
 
 function prevent_default(f) {
     return (e) => {
@@ -98,25 +76,6 @@ function DiskImageView({image_id}) {
 
     const hover_ref = React.useRef(false);
     hover_ref.current = hovering;
-
-    if (listen) { // Tauri has a separate app level listen event for system drag and drops
-        React.useEffect(() => { // eslint-disable-line react-hooks/rules-of-hooks
-            let canceled = false;
-            listen('tauri://file-drop', async event => {
-                if (canceled) return;
-                if (!hover_ref.current) return;
-                for (let path of event.payload.paths)
-                    try {
-                        pdpfs.cp_into_image(path)
-                    } catch(e) {
-                        set_error(e);
-                        break;
-                    }
-                set_entries(await pdpfs.get_directory_entries());
-            })
-            return () => canceled = true;
-        }, [image_id, set_entries]);
-    }
 
     let sorted = [...entries].sort((a,b) => a.name > b.name ? 1 : a.name == b.name ? 0 : -1);
 
