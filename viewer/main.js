@@ -528,6 +528,7 @@ const extract_needs = (template) => {
                         __need[n] ??= [];
                         __need[n].push(m.id);
                     }
+                    delete m.need;
                 }
                 return m;
             });
