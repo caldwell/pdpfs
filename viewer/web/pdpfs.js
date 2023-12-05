@@ -122,8 +122,10 @@ function DiskImageView({image_id}) {
                                                                                                                set_editing(null);
                                                                                                                return false;
                                                                                                            }
-                                                                                                           if (event.key == "Return" || event.key == "Enter")
+                                                                                                           if (event.key == "Return" || event.key == "Enter") {
+                                                                                                               prevent_default()(event);
                                                                                                                rename(e.name, event.target.value);
+                                                                                                           }
                                                                                                          },
                                                                                  }]],
                                                            ['div', { className: 'blocks' }, e.length],
