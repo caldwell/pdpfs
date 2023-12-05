@@ -137,6 +137,8 @@ function DiskImageView({image_id}) {
         return () => { window.removeEventListener("menu:file/rename", handler) };
     }, [set_editing, selected_values]);
 
+    const editee = React.useRef();
+
     return jsr(['div', { className: `directory-list ${hovering ? "hover" : ""}`, ref: drop },
                 ['div', { className: 'header' },
                  ['div', { className: 'filename' }, "Filename"],
@@ -144,6 +146,10 @@ function DiskImageView({image_id}) {
                  ['div', { className: 'size' }, "File Size"],
                  ['div', { className: 'date' }, "Creation Date"]],
                 ['div', { className: 'body' },
+                 // I don't like this, but I can't figure out why the Rename edit box doesn't blur on its own
+                 // sometimes. I think it has to do with the 'prevent_default' in selection stuff's
+                 // onMouseDown. So here's a bandaid on top that seems to work.
+                 { onMouseDownCapture: (event) => { if (editing && event.target != editee.current) editee.current.blur() } },
                  make_selectable(sorted.map((e) => ({ value: e.name,
                                                       el: ['div', { draggable: true, className: `direntry` },
                                                            { onDragStart: prevent_default((_event) => {
@@ -157,7 +163,7 @@ function DiskImageView({image_id}) {
                                                                                  // Mimic macOS Finder: a click only renames if the file is already selected.
                                                                                  { onClick: () => { if (mouse_state() == 'clicked-on-selection')
                                                                                                         set_editing(e.name) } }]
-                                                                              : ['input', { type: "text", size: 12, defaultValue: e.name, autoFocus: true },
+                                                                              : ['input', { type: "text", size: 12, defaultValue: e.name, autoFocus: true, ref:_=>editee.current=_ },
                                                                                  { onFocus: (event) => event.target.select(),
                                                                                    onBlur: (event) => { rename(e.name, event.target.value) },
                                                                                    onKeyDown: (event) => { if (event.key == "Escape") {
