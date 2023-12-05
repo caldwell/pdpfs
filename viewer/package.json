@@ -11,7 +11,9 @@
     "build-debug": "npm run build --",
     "build-release": "npm run build -- --release",
     "install": "npm run build-release",
-    "test": "cargo test"
+    "test": "cargo test",
+    "launch": "./node_modules/.bin/electron --inspect electron.cjs",
+    "build-launch": "npm run build && npm run launch"
   },
   "author": "",
   "license": "ISC",
