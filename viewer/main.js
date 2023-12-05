@@ -240,8 +240,10 @@ class ImageWindow {
             this.image.save();
             this.update_edited();
         } catch(e) {
-            await dialog.showErrorBox(`Could not save ${path.basename(this,image.path)}:`, e.toString());
-            return;
+            await show_error({window:this.window,
+                              title: "Save Error",
+                              message: `Could not save ${path.basename(this, this.image.path)}:`,
+                              detail: e.toString() });
         }
     }
 
@@ -318,13 +320,10 @@ class ImageWindow {
                     failed.push({ file: f, error: e})
                 }
             if (failed.length != 0)
-                dialog.showMessageBox(this.window, {
-                    message: `The following files failed to import:\n${failed.map(f=>f.file).join("\n")}\n`,
-                    type: "error",
-                    title: "Import Error",
-                    detail: 'The errors encountered were:\n' + failed.map(f=>`${path.basename(f.file).toUpperCase()}: ${f.error}\n`).join(''),
-                    textWidth: 600,
-                });
+                show_error({ window:this.window,
+                             title: "Import Error",
+                             message: `The following files failed to import:\n${failed.map(f=>f.file).join("\n")}\n`,
+                             detail: 'The errors encountered were:\n' + failed.map(f=>`${path.basename(f.file).toUpperCase()}: ${f.error}\n`).join('')});
         } catch(e) {
             await dialog.showErrorBox("Importing failed", e.toString());
         }
@@ -378,13 +377,10 @@ class ImageWindow {
                     failed.push({ file: f, error: e})
                 }
             if (failed.length != 0)
-                dialog.showMessageBox(this.window, {
-                    message: `The following files failed to export:\n${failed.map(f=>f.file).join("\n")}\n`,
-                    type: "error",
-                    title: "Export Error",
-                    detail: 'The errors encountered were:\n' + failed.map(f=>`${f.file}: ${f.error}\n`).join(''),
-                    textWidth: 600,
-                });
+                show_error({ window: this.window,
+                             title: "Export Error",
+                             message: `The following files failed to export:\n${failed.map(f=>f.file).join("\n")}\n`,
+                             detail: 'The errors encountered were:\n' + failed.map(f=>`${f.file}: ${f.error}\n`).join('') });
         } catch(e) {
             await dialog.showErrorBox("Exporting failed", e.toString());
         }
@@ -463,9 +459,20 @@ function open_image(image_path) {
     try {
         new ImageWindow(new Image({image_path}));
     } catch(e) {
-        dialog.showErrorBox(`Unable to open ${path.basename(image_path)}`,
-                            `There was an error loading the image: ${e}`);
+        show_error({title: "Open Error",
+                    message: `Unable to open ${path.basename(image_path)}`,
+                    detail: `${e}`});
     }
+}
+
+async function show_error({window, message, title, detail}) {
+    await dialog.showMessageBox(window, {
+        type: "error",
+        textWidth: 500,
+        message,
+        title,
+        detail,
+    });
 }
 
 const update_menus = (selected, is_image_window, is_dirty) => {
