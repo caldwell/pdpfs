@@ -61,14 +61,7 @@ function DiskImageView({image_id}) {
     const [{hovering}, drop] = useDrop(() => ({
         accept: NativeTypes.FILE,
         drop: (drop_obj, _monitor) => {
-            for (let file of drop_obj.files)
-                try {
-                    pdpfs.cp_into_image(file.path)
-                } catch(e) {
-                    set_error(e);
-                    break;
-                }
-            (async () => { set_entries(await pdpfs.get_directory_entries()) })();
+            pdpfs.import_files(drop_obj.files.map(f => f.path));
             return { yo:"yo" }
         },
         collect: (monitor) => ({ hovering: monitor.isOver() }),

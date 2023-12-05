@@ -100,16 +100,16 @@ class ImageWindow {
         win.webContents.ipc.on('app:set_selected', (event, selected) => this.set_selected(selected));
         win.webContents.ipc.on('app:context_menu', (event, selected) => this.context_menu(selected));
         win.webContents.ipc.on('ondragstart', (event) => this.drag_start());
+        win.webContents.ipc.on('app:import_files', (event, paths) => this.import_files(paths));
         win.webContents.ipc.handle('pdpfs:rm', (event, ...files) => this.rm(...files));
         win.webContents.ipc.handle('pdpfs:mv', (event, src, dest) => this.mv(src, dest));
         win.webContents.ipc.handle('pdpfs:get_directory_entries',          (event)       => this.image.get_directory_entries());
         win.webContents.ipc.handle('pdpfs:image_is_dirty',                 (event)       => this.image.image_is_dirty());
-        win.webContents.ipc.handle('pdpfs:cp_into_image',         modifies((event, path) => this.image.cp_into_image(path)));
         win.webContents.ipc.handle('pdpfs:save',                  modifies((event)       => this.image.save()));
         win.on('menu:file/save', async (event) => await this.save());
         win.on('menu:file/save-as', async (event) => await this.save_as());
         win.on('menu:file/delete', (event) => this.rm(...this.selected));
-        win.on('menu:file/import', async (event) => await this.import_files());
+        win.on('menu:file/import', async (event) => await this.import());
         win.on('menu:file/export', async (event) => await this.export_files(this.selected));
     }
 
@@ -276,18 +276,20 @@ class ImageWindow {
         this.add_to_recent();
     }
 
-    async import_files() {
+    async import() {
         let { canceled, filePaths, _bookmark } = await dialog.showOpenDialog(this.window, {
             title: `Select the files to import.`,
             buttonLabel: "Import",
             properties: ['multiSelections', 'openFile', 'createDirectory', 'showOverwriteConfirmation', 'promptToCreate'],
         });
         if (canceled) return;
+        await this.import_files(filePaths);
+    }
 
+    async import_files(paths) {
         try {
             // Can we check filenames up front?
-            let to_import = filePaths;
-            let existence = filePaths.map(f => ({ file: f, exists: this.image.stat(path.basename(f).toUpperCase()) != null }));
+            let existence = paths.map(f => ({ file: f, exists: this.image.stat(path.basename(f).toUpperCase()) != null }));
             let existing_files = existence.filter(e => e.exists).map(e => e.file);
             if (existing_files.length != 0) {
                 let { response } = await dialog.showMessageBox(this.window, {
@@ -304,12 +306,12 @@ class ImageWindow {
                 if (response == 1) // Overwrite
                     ;// Don't need to do anything, we overwrite by default :-)
                 if (response == 2) // Don't overwrite
-                    to_import = existence.filter(e => !e.exists).map(e => e.file);
+                    paths = existence.filter(e => !e.exists).map(e => e.file);
             }
 
 
             let failed = [];
-            for (let f of to_import)
+            for (let f of paths)
                 try {
                     this.image.cp_into_image(f, '.');
                 } catch(e) {
