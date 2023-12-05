@@ -221,7 +221,14 @@ class ImageWindow {
     }
 
     mv(src, dest) {
-        this.image.mv(src, dest);
+        try {
+            this.image.mv(src, dest);
+        } catch(e) {
+            show_error({ window: this.window,
+                         title: "Rename Error",
+                         message: `Could not rename ${src} to ${dest}`,
+                         detail: `${e}` });
+        }
         this.update_edited();
         this.update_entries();
     }
