@@ -75,9 +75,9 @@ function DiskImageView({image_id}) {
     const [editing, set_editing] = React.useState(null);
     const rename = async (src, dest) => {
         try {
+            set_editing(null);
             if (src != dest)
                 await pdpfs.mv(src, dest);
-            set_editing(null);
         } catch(e) {
             // Maybe a tooltip??
             console.log(e);
