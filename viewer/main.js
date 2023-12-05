@@ -303,11 +303,11 @@ class ImageWindow {
             if (existing_files.length != 0) {
                 let { response } = await dialog.showMessageBox(this.window, {
                     message: `The following items already exist in image:\n${existing_files.join("\n")}`,
-                    defails: "What are details like????",
                     type: "question",
                     buttons: ["&Cancel Import", "&Overwrite", "&Don't Overwrite"],
                     defaultId: 2,
                     normalizeAccessKeys: true,
+                    textWidth: 400,
                 });
 
                 if (response == 0) // Cancel
@@ -361,11 +361,11 @@ class ImageWindow {
             if (existing_files.length != 0) {
                 let { response } = await dialog.showMessageBox(this.window, {
                     message: `The following items exist in the output directory:\n${existing_files.join("\n")}`,
-                    defails: "What are details like????",
                     type: "question",
                     buttons: ["&Cancel Export", "&Overwrite", "&Don't Overwrite"],
                     defaultId: 2,
                     normalizeAccessKeys: true,
+                    textWidth: 400,
                 });
 
                 if (response == 0) // Cancel
