@@ -174,7 +174,7 @@ function DiskImageView({image_id}) {
 }
 
 function useSelection(on_change) {
-    let values = React.useRef();
+    let values = React.useRef([]);
 
     const [selection, _set_selection] = React.useState([]);
 
