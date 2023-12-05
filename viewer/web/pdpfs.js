@@ -158,8 +158,7 @@ function DiskImageView({image_id}) {
                                                                               : ['input', { type: "text", size: 12, defaultValue: e.name, autoFocus: true },
                                                                                  { onFocus: (event) => event.target.select(),
                                                                                    onBlur: (event) => { rename(e.name, event.target.value) },
-                                                                                   onKeyDown: (event) => { console.log("keydown", event);
-                                                                                                           if (event.key == "Escape") {
+                                                                                   onKeyDown: (event) => { if (event.key == "Escape") {
                                                                                                                set_editing(null);
                                                                                                                return false;
                                                                                                            }
