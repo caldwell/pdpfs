@@ -299,7 +299,7 @@ class ImageWindow {
         try {
             // Can we check filenames up front?
             let existence = paths.map(f => ({ file: f, exists: this.image.stat(path.basename(f).toUpperCase()) != null }));
-            let existing_files = existence.filter(e => e.exists).map(e => e.file);
+            let existing_files = existence.filter(e => e.exists).map(e => path.basename(e.file));
             if (existing_files.length != 0) {
                 let { response } = await dialog.showMessageBox(this.window, {
                     message: `The following items already exist in image:\n${existing_files.join("\n")}`,
