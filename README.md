@@ -18,6 +18,7 @@ Find the latest version at https://porkrind.org/pdpfs
     pdpfs [-h] -i <image> cp <source-file> <dest-file>
     pdpfs [-h] -i <image> mv [-f] <source-file> <dest-file>
     pdpfs [-h] -i <image> rm <file>
+    pdpfs [-h] -i <image> cat <file>
     pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
     pdpfs [-h] -i <image> dump [--sector]
     pdpfs [-h] -i <image> dump-home
@@ -73,6 +74,10 @@ unless the `--force` option is used.
 #### `rm <file>`
 
 `<file>` will be deleted from the image.
+
+#### `cat <file`
+
+Prints the contents of `<file>` to stdout.
 
 #### `dump [--sector]`
 

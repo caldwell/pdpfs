@@ -24,6 +24,7 @@ Usage:
   pdpfs [-h] -i <image> cp <source-file> <dest-file>
   pdpfs [-h] -i <image> mv [-f] <source-file> <dest-file>
   pdpfs [-h] -i <image> rm <file>
+  pdpfs [-h] -i <image> cat <file>
   pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
   pdpfs [-h] -i <image> dump [--sector]
   pdpfs [-h] -i <image> dump-home
@@ -72,6 +73,9 @@ Options:
  rm:
    <file> will be deleted from the image.
 
+ cat:
+   Prints the contents of <file> to stdout.
+
  dump:
    -s --sector            Dump by blocks instead of sectors
 
@@ -110,6 +114,7 @@ struct Args {
     cmd_dump_home:    bool,
     cmd_dump_dir:     bool,
     cmd_mkfs:         bool,
+    cmd_cat:          bool,
     cmd_convert:      bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
@@ -174,6 +179,12 @@ fn main() -> anyhow::Result<()> {
     if args.cmd_mv {
         mv(&mut fs, &args.arg_source_file, &args.arg_dest_file, args.flag_force)?;
         save_image(fs.block_device().physical_device(), &args.flag_image)?;
+    }
+
+    if args.cmd_cat {
+        use std::io::Write;
+        let data = fs.read_file(&ops::path_to_rt11_filename(&args.arg_file)?)?;
+        std::io::stdout().write_all(data.as_bytes())?;
     }
 
     Ok(())
