@@ -1,12 +1,12 @@
 {
-  "name": "viewer",
+  "name": "pdpfs-shim",
   "version": "0.1.0",
   "description": "",
-  "main": "index.node",
+  "main": "electron.cjs",
   "type": "module",
   "scripts": {
     "build": "npm run build-rs && npm run build-web",
-    "build-rs": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics",
+    "build-rs": "cargo-cp-artifact -nc pdpfs.node -- cargo build --message-format=json-render-diagnostics",
     "build-web": "esbuild web/pdpfs.js --sourcemap --metafile=bundle-meta.json --outfile=web/pdpfs.bundle.js --external:'/assets/*' --bundle --target=chrome118",
     "build-debug": "npm run build --",
     "build-release": "npm run build -- --release",

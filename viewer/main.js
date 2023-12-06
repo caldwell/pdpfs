@@ -9,7 +9,7 @@ import fs from 'node:fs';
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const require = createRequire(import.meta.url);
 const { app, BrowserWindow, Menu, MenuItem, ipcMain, dialog } = require('electron');
-const pdpfs = require(__dirname);
+const pdpfs = require('./pdpfs.node');
 
 class Image {
     static images = {};
