@@ -20,7 +20,7 @@ Find the latest version at https://porkrind.org/pdpfs
     pdpfs [-h] -i <image> rm <file>
     pdpfs [-h] -i <image> cat <file>
     pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
-    pdpfs [-h] -i <image> dump [--sector]
+    pdpfs [-h] -i <image> dump [--sector] [<file>]
     pdpfs [-h] -i <image> dump-home
     pdpfs [-h] -i <image> dump-dir
     pdpfs [-h] -i <image> convert <image-type> <dest-file>
@@ -79,11 +79,13 @@ unless the `--force` option is used.
 
 Prints the contents of `<file>` to stdout.
 
-#### `dump [--sector]`
+#### `dump [--sector] [<file>]`
 
     -s --sector            Dump by blocks instead of sectors
 
 Print a hex dump of the logical blocks of the image, de-interleaving floppy images.
+
+If `<file>` is specified, dumps the file instead of the image.
 
 #### `dump-home`
 

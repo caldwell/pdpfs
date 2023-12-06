@@ -173,6 +173,18 @@ pub fn dump(image: &Box<dyn BlockDevice>, by_sector: bool) -> anyhow::Result<()>
     Ok(())
 }
 
+pub fn dump_file(fs: &impl FileSystem, file: &Path, by_sector: bool) -> anyhow::Result<()> {
+    let file = path_to_rt11_filename(&file)?;
+    let data = fs.read_file(&file)?;
+    let chunk_size = if by_sector { fs.block_device().sector_size() } else { crate::block::BLOCK_SIZE };
+    for c in 0..data.len()/chunk_size {
+        println!("{} Logical {} {}\n{:?}", file, // It would be really nice to be able to print the physical block here...
+            if by_sector { "Sector" } else { "Block" },
+            c, data.as_bytes()[c*chunk_size..(c+1)*chunk_size].hex_dump());
+    }
+    Ok(())
+}
+
 pub fn dump_home(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
     let home = RT11FS::read_homeblock(image)?;
     println!("{:#?}", home);

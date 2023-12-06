@@ -26,7 +26,7 @@ Usage:
   pdpfs [-h] -i <image> rm <file>
   pdpfs [-h] -i <image> cat <file>
   pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
-  pdpfs [-h] -i <image> dump [--sector]
+  pdpfs [-h] -i <image> dump [--sector] [<file>]
   pdpfs [-h] -i <image> dump-home
   pdpfs [-h] -i <image> dump-dir
   pdpfs [-h] -i <image> convert <image-type> <dest-file>
@@ -81,6 +81,8 @@ Options:
 
    Dumps the image, de-interleaving floppy images.
 
+   If <file> is specified, dumps the file instead of the image.
+
  mkfs:
    Initializes a new image. The <image> file specified by `-i` will be created
    and must _not_ already exist.
@@ -118,7 +120,7 @@ struct Args {
     cmd_convert:      bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
-    arg_file:         PathBuf,
+    arg_file:         Option<PathBuf>,
     arg_device_type:  Option<DeviceType>,
     arg_image_type:   Option<ImageType>,
     arg_filesystem:   Option<FileSystemType>,
@@ -138,7 +140,7 @@ fn main() -> anyhow::Result<()> {
     let dev = open_device(&args.flag_image)?;
 
     // Do this early so we can dump corrupt images (since RT11FS::new() might die).
-    if args.cmd_dump {
+    if args.cmd_dump && args.arg_file.is_none() {
         return dump(&dev, args.flag_sector);
     }
 
@@ -172,8 +174,9 @@ fn main() -> anyhow::Result<()> {
     }
 
     if args.cmd_rm {
-        rm(&mut fs, &args.arg_file)?;
+        rm(&mut fs, &args.arg_file.unwrap())?;
         save_image(fs.block_device().physical_device(), &args.flag_image)?;
+        return Ok(())
     }
 
     if args.cmd_mv {
@@ -181,9 +184,14 @@ fn main() -> anyhow::Result<()> {
         save_image(fs.block_device().physical_device(), &args.flag_image)?;
     }
 
+    if args.cmd_dump && args.arg_file.is_some() {
+        dump_file(&fs, &args.arg_file.unwrap(), args.flag_sector)?;
+        return Ok(())
+    }
+
     if args.cmd_cat {
         use std::io::Write;
-        let data = fs.read_file(&ops::path_to_rt11_filename(&args.arg_file)?)?;
+        let data = fs.read_file(&ops::path_to_rt11_filename(&args.arg_file.unwrap())?)?;
         std::io::stdout().write_all(data.as_bytes())?;
     }
 
