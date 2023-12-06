@@ -20,10 +20,10 @@ Find the latest version at https://porkrind.org/pdpfs
     pdpfs [-h] -i <image> rm <file>
     pdpfs [-h] -i <image> cat <file>
     pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
+    pdpfs [-h] -i <image> convert <image-type> <dest-file>
     pdpfs [-h] -i <image> dump [--sector] [<file>]
     pdpfs [-h] -i <image> dump-home
     pdpfs [-h] -i <image> dump-dir
-    pdpfs [-h] -i <image> convert <image-type> <dest-file>
 
 ### Options:
 
@@ -79,6 +79,21 @@ unless the `--force` option is used.
 
 Prints the contents of `<file>` to stdout.
 
+#### `mkfs <device-type> <filesystem>`
+
+Initializes a new image. The `<image>` file specified by `-i` will be created
+and must _not_ already exist.
+
+`<device-type>` must be: `rx01`
+
+`<filesystem>` must be one of: `rt11`, `xxdp`
+
+#### `convert <image-type> <dest-file>`
+
+Convert the image to a different image file type.
+
+`<image-type>` must be one of: `img`, `imd`
+
 #### `dump [--sector] [<file>]`
 
     -s --sector            Dump by blocks instead of sectors
@@ -94,21 +109,6 @@ Print a debug dump of the fields of the home block.
 #### `dump-dir`
 
 Print a debug dump of the fields of the directory segments.
-
-#### `mkfs <device-type> <filesystem>`
-
-Initializes a new image. The `<image>` file specified by `-i` will be created
-and must _not_ already exist.
-
-`<device-type>` must be: `rx01`
-
-`<filesystem>` must be one of: `rt11`, `xxdp`
-
-#### `convert <image-type> <dest-file>`
-
-Convert the image to a different image file type.
-
-`<image-type>` must be one of: `img`, `imd`
 
 ## Examples
 

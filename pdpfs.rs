@@ -26,10 +26,10 @@ Usage:
   pdpfs [-h] -i <image> rm <file>
   pdpfs [-h] -i <image> cat <file>
   pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
+  pdpfs [-h] -i <image> convert <image-type> <dest-file>
   pdpfs [-h] -i <image> dump [--sector] [<file>]
   pdpfs [-h] -i <image> dump-home
   pdpfs [-h] -i <image> dump-dir
-  pdpfs [-h] -i <image> convert <image-type> <dest-file>
 
 Options:
   -h --help              Show this screen.
@@ -76,13 +76,6 @@ Options:
  cat:
    Prints the contents of <file> to stdout.
 
- dump:
-   -s --sector            Dump by blocks instead of sectors
-
-   Dumps the image, de-interleaving floppy images.
-
-   If <file> is specified, dumps the file instead of the image.
-
  mkfs:
    Initializes a new image. The <image> file specified by `-i` will be created
    and must _not_ already exist.
@@ -95,6 +88,13 @@ Options:
    Convert the image to a different image file type.
 
    <image-type> must be one of: {}
+
+ dump:
+   -s --sector            Dump by blocks instead of sectors
+
+   Dumps the image, de-interleaving floppy images.
+
+   If <file> is specified, dumps the file instead of the image.
 "#,
     DeviceType::VARIANTS.iter().map(|s| *s).filter(|t| *t != "flat").collect::<Vec<&str>>().join(", "),
     FileSystemType::VARIANTS.join(", "),
