@@ -1,5 +1,6 @@
 {
   "name": "pdpfs-shim",
+  "productName": "PDP-FS",
   "version": "0.1.0",
   "description": "",
   "main": "electron.cjs",
@@ -13,12 +14,20 @@
     "install": "npm run build-release",
     "test": "cargo test",
     "launch": "./node_modules/.bin/electron --inspect electron.cjs",
-    "build-launch": "npm run build && npm run launch"
+    "build-launch": "npm run build && npm run launch",
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@caldwell/jsml": "^1.1.5",
+    "@electron-forge/cli": "^7.2.0",
+    "@electron-forge/maker-dmg": "^7.2.0",
+    "@electron-forge/maker-squirrel": "^7.2.0",
+    "@electron-forge/maker-zip": "^7.2.0",
     "@eslint/eslintrc": "^2.1.4",
     "bootstrap": "^5.3.0-alpha1",
     "cargo-cp-artifact": "^0.1",
