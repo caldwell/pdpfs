@@ -90,11 +90,11 @@ Options:
    <image-type> must be one of: {}
 
  dump:
-   -s --sector            Dump by blocks instead of sectors
+   -s --sector            Dump by sectors instead of blocks
 
    Dumps the image, de-interleaving floppy images.
 
-   If <file> is specified, dumps the file instead of the image.
+   If <file> is specified, dumps the file instead of the whole image.
 "#,
     DeviceType::VARIANTS.iter().map(|s| *s).filter(|t| *t != "flat").collect::<Vec<&str>>().join(", "),
     FileSystemType::VARIANTS.join(", "),
