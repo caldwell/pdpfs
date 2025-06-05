@@ -168,13 +168,18 @@ impl<B: BlockDevice> XxdpFs<B> {
     }
 
     pub fn read_chain_raw(image: &B, start_block: u16) -> anyhow::Result<Vec<(u16, ByteBuffer)>> {
+        let mut seen = std::collections::HashSet::new();
         let mut blocklist: Vec<(u16, ByteBuffer)> = vec![];
         let mut block = start_block;
         while block != 0 {
+            if seen.contains(&block) {
+                return Err(anyhow!("Duplicate block in chain: {block}"));
+            }
             let mut buf = image.read_blocks(block.into(), 1)?;
             buf.set_endian(Endian::LittleEndian);
             let next = buf.read_u16()?;
             blocklist.push((block, buf));
+            seen.insert(block);
             block = next;
         }
         Ok(blocklist)
