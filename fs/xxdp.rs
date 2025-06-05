@@ -471,6 +471,18 @@ impl MfdVariantOne {
         buf[0].set_endian(Endian::LittleEndian);
         buf[1].set_endian(Endian::LittleEndian);
 
+        // The 2nd block of the MFD contains many hardcoded constants to
+        // sanity check against. That helps prevent false positives when
+        // auto-detecting the filesystem.
+        buf[1].set_rpos(0);
+        if  buf[1].read_u16()? != 0 ||
+            buf[1].read_u16()? != 0o401 ||
+            { buf[1].read_u16()?;
+              buf[1].read_u16()? } != 9 ||
+            buf[1].read_u16()? != 0 {
+            return Err(anyhow!("Bad block 2 of MFD"));
+        }
+
         Ok(MfdVariantOne {
             mfd2_block: buf[0].read_u16()?,
             interleave_factor: buf[0].read_u16()?,
