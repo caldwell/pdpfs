@@ -192,16 +192,21 @@ pub fn dump_home(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
 }
 
 pub fn dump_dir(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
-    let segment_block = RT11FS::read_homeblock(image).map(|home| home.directory_start_block).unwrap_or(6);
+    let segment_start_block = RT11FS::read_homeblock(image).map(|home| home.directory_start_block).unwrap_or(6);
+    let mut segment_num: u16 = 1;
 
-    for (num, segment) in RT11FS::read_directory(image, segment_block).enumerate() {
+    for segment in RT11FS::read_directory(image, segment_start_block) {
         match segment {
-            Ok(segment) => println!("{:#?}", segment),
+            Ok(segment) => {
+                println!("{:#?}", segment);
+                segment_num = segment.next_segment;
+            },
             Err(e) => {
                 // This is for debug purposes. Try to dump as much possible without erroring out
-                println!("Error reading segment {}: {:#}. Raw Dump:", num, e);
+                let segment_block = crate::fs::rt11::DirSegment::segment_block(segment_start_block, segment_num);
+                println!("Error reading segment #{}: {:#}. Raw Dump @ {}:", segment_num, e, segment_block);
 
-                let mut buf = image.read_blocks((segment_block + num as u16 * 2) as usize, 2)?;
+                let mut buf = image.read_blocks(segment_block as usize, 2)?;
                 buf.set_endian(bytebuffer::Endian::LittleEndian);
 
                 let seg = DirSegment {
@@ -211,9 +216,10 @@ pub fn dump_dir(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
                     extra_bytes: buf.read_u16()?,
                     data_block: buf.read_u16()?,
                     entries: vec![],
+                    segment: segment_num,
                     block: segment_block,
                 };
-                println!("{:?}", seg);
+                println!("{:#?}", seg);
                 for entry in 0..(512-5)/7 {
                     print!("Directory Entry {}: ", entry);
                     for w in 0..7 {

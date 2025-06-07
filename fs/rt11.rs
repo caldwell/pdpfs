@@ -373,14 +373,18 @@ pub struct DirSegment {
 
     // Not part of the format.
     pub block: u16, // The block number of _this_ segment
+    pub segment: u16, // The logical segment number (1 based)
 }
 
 impl DirSegment {
+    pub fn segment_block(seg_start_block: u16, segment: u16) -> u16 { seg_start_block + (segment-1) * 2 }
+
     // This is for initializing a new set of segments on a blank disk
     pub fn new(my_block: u16, segments: u16, total_blocks: u16) -> DirSegment {
         let data_block = my_block + segments * 2;
         let segments = 4; // This is RT-11's default. Should it be configurable like it is there?
         DirSegment {
+            segment: 1,
             block: my_block,
             segments,
             next_segment: 0,
@@ -391,11 +395,12 @@ impl DirSegment {
         }
     }
 
-    pub fn from_repr(my_block: u16, mut buf: ByteBuffer) -> anyhow::Result<DirSegment> {
+    pub fn from_repr(segment: u16, my_block: u16, mut buf: ByteBuffer) -> anyhow::Result<DirSegment> {
         buf.set_endian(Endian::LittleEndian);
         let extra_bytes;
         let data_block;
         Ok(DirSegment {
+            segment,
             block: my_block,
             segments: buf.read_u16()?,
             next_segment: buf.read_u16()?,
@@ -459,17 +464,23 @@ impl DirSegment {
         // entries. I believe this is more correct.
         (BLOCK_SIZE * SEGMENT_BLOCKS - SEGMENT_HEADER_BYTES - SEGMENT_END_MARKER_BYTES) / (DIR_ENTRY_BYTES + self.extra_bytes as usize) - RESERVED_ENTRIES
     }
+
+    /// Returns the block range this directory segment represents
+    fn block_range(&self) -> Range<u16> {
+        let block_count: usize = self.entries.iter().map(|e| e.length).sum();
+        self.data_block..self.data_block+block_count as u16
+    }
 }
 
 impl Debug for DirSegment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, r#"Directory Segment {0} header:
+        write!(f, r#"Directory Segment #{6} @ {0} header:
     segments     : {1:#08o} {1:#06x} {1},
     next_segment : {2:#08o} {2:#06x} {2},
     last_segment : {3:#08o} {3:#06x} {3},
     extra_bytes  : {4:#08o} {4:#06x} {4},
     data_block   : {5:#08o} {5:#06x} {5}
-"#, self.block/2, self.segments, self.next_segment, self.last_segment, self.extra_bytes, self.data_block)?;
+"#, self.block, self.segments, self.next_segment, self.last_segment, self.extra_bytes, self.data_block, self.segment)?;
         if f.alternate() {
             write!(f, "entries: {}\n", self.entries.len())?;
             for e in self.entries.iter() {
@@ -487,8 +498,8 @@ pub struct DirSegmentIterator<'a, B: BlockDevice> {
 
 impl<'a, B: BlockDevice> DirSegmentIterator<'a, B> {
     fn segment(&self, segment: u16) -> anyhow::Result<DirSegment> {
-        let block = self.directory_start_block + (segment-1) * 2;
-        Ok(DirSegment::from_repr(block, self.image.read_blocks(block as usize, 2)?)
+        let block = DirSegment::segment_block(self.directory_start_block, segment);
+        Ok(DirSegment::from_repr(segment, block, self.image.read_blocks(block as usize, 2)?)
             .with_context(|| format!("Bad Directory Segment #{} (@ {})", segment, block))?)
     }
 }
