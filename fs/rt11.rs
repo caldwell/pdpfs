@@ -858,7 +858,7 @@ mod test {
         {
             let mut f = fs.create("TEST.TXT", 512).expect("write test.txt");
             assert_eq!(f.pos, 0);
-            assert_eq!(f.residue, vec![]);
+            assert_eq!(f.residue, Vec::<u8>::new());
             f.write(&incrementing(256)).expect("write");
             assert_eq!(f.residue, incrementing(256));
             f.write(&incrementing(256)).expect("write");
