@@ -11,7 +11,9 @@ use crate::fs::xxdp::XxdpFs;
 use crate::fs::{FileSystem,DirEntry};
 use crate::fs::rt11::{DirSegment,RT11FS};
 
+use std::cmp::min;
 use std::fs::rename;
+use std::ops::Range;
 use std::path::{PathBuf, Path};
 
 use anyhow::{anyhow, Context};
@@ -160,24 +162,26 @@ pub fn save_image(dev: Box<&dyn PhysicalBlockDevice>, filename: &Path) -> anyhow
     Ok(())
 }
 
-pub fn dump(image: &Box<dyn BlockDevice>, by_sector: bool) -> anyhow::Result<()> {
+pub fn dump(image: &Box<dyn BlockDevice>, by_sector: bool, range: Option<Range<usize>>) -> anyhow::Result<()> {
+    let range = range.unwrap_or(0..usize::MAX);
     if by_sector {
-        for s in 0..image.sectors() {
+        for s in range.start..min(range.end,image.sectors()) {
             println!("Sector {}\n{:?}", s, image.read_sector(s)?.hex_dump());
         }
     } else {
-        for b in 0..image.blocks() {
+        for b in range.start..min(range.end,image.blocks()) {
             println!("Block {}\n{:?}", b, image.read_blocks(b, 1)?.as_bytes().hex_dump());
         }
     }
     Ok(())
 }
 
-pub fn dump_file(fs: &impl FileSystem, file: &Path, by_sector: bool) -> anyhow::Result<()> {
+pub fn dump_file(fs: &impl FileSystem, file: &Path, by_sector: bool, range: Option<Range<usize>>) -> anyhow::Result<()> {
+    let range = range.unwrap_or(0..usize::MAX);
     let file = path_to_rt11_filename(&file)?;
     let data = fs.read_file(&file)?;
     let chunk_size = if by_sector { fs.block_device().sector_size() } else { crate::block::BLOCK_SIZE };
-    for c in 0..data.len()/chunk_size {
+    for c in range.start..min(range.end, data.len()/chunk_size) {
         println!("{} Logical {} {}\n{:?}", file, // It would be really nice to be able to print the physical block here...
             if by_sector { "Sector" } else { "Block" },
             c, data.as_bytes()[c*chunk_size..(c+1)*chunk_size].hex_dump());

@@ -25,3 +25,4 @@ serde = "1"
 whoami = "1"
 join-string = "0.3.0"
 strum = { version = "0.25.0", features = ["derive"] }
+serde_with = "3.12.0"

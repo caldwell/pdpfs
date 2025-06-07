@@ -27,7 +27,7 @@ Usage:
   pdpfs [-h] -i <image> cat <file>
   pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
   pdpfs [-h] -i <image> convert <image-type> <dest-file>
-  pdpfs [-h] -i <image> dump [--sector] [<file>]
+  pdpfs [-h] -i <image> dump [--range <range>] [--sector] [<file>]
   pdpfs [-h] -i <image> rt11 dump-home
   pdpfs [-h] -i <image> rt11 dump-dir
 
@@ -91,6 +91,13 @@ Options:
 
  dump:
    -s --sector            Dump by sectors instead of blocks
+   -r --range=<range>     Dump the specified range instead of the whole image or file.
+                          Range is specified like "<start>..<end>" where <end> is non-inclusive.
+                          Both <start> and <end> are optional--when they are missing it means to
+                          use their respective ends. Eg: If a file is 25 blocks long then "0..25",
+                          "0..", "..25", and ".." all mean the entire range of the file.
+                          If you want to specify a single block/sector you can just pass a single
+                          number (and omit the ".." completely).
 
    Dumps the image, de-interleaving floppy images.
 
@@ -105,6 +112,7 @@ Options:
 struct Args {
     flag_image:       PathBuf,
     flag_sector:      bool,
+    flag_range:       Option<Range>,
     flag_long:        bool,
     flag_all:         bool,
     flag_force:       bool,
@@ -142,7 +150,7 @@ fn main() -> anyhow::Result<()> {
 
     // Do this early so we can dump corrupt images (since RT11FS::new() might die).
     if args.cmd_dump && args.arg_file.is_none() {
-        return dump(&dev, args.flag_sector);
+        return dump(&dev, args.flag_sector, args.flag_range.map(|r| r.into()));
     }
 
     if args.cmd_rt11 && args.cmd_dump_home {
@@ -186,7 +194,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     if args.cmd_dump && args.arg_file.is_some() {
-        dump_file(&fs, &args.arg_file.unwrap(), args.flag_sector)?;
+        dump_file(&fs, &args.arg_file.unwrap(), args.flag_sector, args.flag_range.map(|r| r.into()))?;
         return Ok(())
     }
 
@@ -197,4 +205,43 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+use serde_with::DeserializeFromStr;
+#[derive(Debug, DeserializeFromStr)]
+struct Range(std::ops::Range<usize>);
+
+impl std::fmt::Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}..{}", self.0.start, self.0.end)
+    }
+}
+
+impl std::str::FromStr for Range {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((start, end)) = s.split_once("..") else {
+            let one: usize = s.parse()?;
+            return Ok(Range((one..one+1) .into()));
+        };
+
+        let range = match (start, end) {
+            ("",    "")  => 0..usize::MAX,
+            ("",    end) => 0..end.parse()?,
+            (start, "")  => start.parse()?..usize::MAX,
+            (start, end) => start.parse()?..end.parse()?,
+        };
+
+        if range.start > range.end {
+            return Err(anyhow!("{s:?}: start is bigger then end"));
+        }
+
+        Ok(Range(range))
+    }
+}
+
+impl From<Range> for std::ops::Range<usize> {
+    fn from(value: Range) -> Self {
+        value.0
+    }
 }
