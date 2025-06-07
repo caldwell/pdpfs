@@ -513,6 +513,7 @@ impl Debug for DirSegment {
 "#, self.block, self.segments, self.next_segment, self.last_segment, self.extra_bytes, self.data_block, self.segment)?;
         if f.alternate() {
             write!(f, "entries: {}\n", self.entries.len())?;
+            write!(f, "block range: {:?}\n", self.block_range())?;
             for e in self.entries.iter() {
                 write!(f, "{:#?}\n", e)?;
             }
