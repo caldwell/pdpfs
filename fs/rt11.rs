@@ -621,13 +621,13 @@ impl DirEntry {
     }
 
     pub fn decode_date(raw: u16) -> anyhow::Result<Option<NaiveDate>> {
-        let (age, month, day, year) = (((raw & 0b11_0000_00000_00000) >> 14) as i32,
+        let (age, month, day, year) = (((raw & 0b11_0000_00000_00000) >> 14) as u32,
                                        ((raw & 0b00_1111_00000_00000) >> 10) as u32,
                                        ((raw & 0b00_0000_11111_00000) >>  5) as u32,
-                                       ((raw & 0b00_0000_00000_11111) >>  0) as i32);
+                                       ((raw & 0b00_0000_00000_11111) >>  0) as u32);
         Ok(match raw {
             0 => None,
-            _ => Some(chrono::NaiveDate::from_ymd_opt(1972 + year + age * 32, month, day)
+            _ => Some(chrono::NaiveDate::from_ymd_opt((1972 + year + age * 32) as i32, month, day)
                           .ok_or(anyhow!("Invalid date: {:04}-{:02}-{:02} [{}/{:#06x}/{:#018b}]", year, month, day, raw, raw, raw))?),
            })
     }
