@@ -678,7 +678,7 @@ impl Debug for DirEntry {
             write!(f, "{:<9} {}{}{} {:>3}:{:<3} {:<10} [{:#06x}] {:5} @ {:<5} {}",
                  match self.kind { EntryKind::Permanent => "Permanent",
                                    EntryKind::Empty     => "Empty",
-                                   EntryKind::Tentative => "Tentative"
+                                   EntryKind::Tentative => "Tentative",
                  },
                  if self.read_only    { "R" } else { "-" },
                  if self.protected    { "P" } else { "-" },
