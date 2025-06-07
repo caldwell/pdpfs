@@ -106,7 +106,7 @@ impl<B: BlockDevice> RT11FS<B> {
         DirSegmentIterator {
             image,
             directory_start_block: directory_start_block,
-            next_segment: Some(0),
+            next_segment: Some(1),
         }
     }
 
@@ -487,9 +487,9 @@ pub struct DirSegmentIterator<'a, B: BlockDevice> {
 
 impl<'a, B: BlockDevice> DirSegmentIterator<'a, B> {
     fn segment(&self, segment: u16) -> anyhow::Result<DirSegment> {
-        let block = self.directory_start_block + segment*2;
+        let block = self.directory_start_block + (segment-1) * 2;
         Ok(DirSegment::from_repr(block, self.image.read_blocks(block as usize, 2)?)
-            .with_context(|| format!("Bad Directory Segment #{} (@ {})", segment, self.directory_start_block + segment*2))?)
+            .with_context(|| format!("Bad Directory Segment #{} (@ {})", segment, block))?)
     }
 }
 
