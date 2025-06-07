@@ -538,10 +538,7 @@ impl<'a, B: BlockDevice> Iterator for DirSegmentIterator<'a, B> {
     type Item = anyhow::Result<DirSegment>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Some(next_segment) = self.next_segment else {
-            return None
-        };
-        let (next, segment) = match self.segment(next_segment) {
+        let (next, segment) = match self.segment(self.next_segment?) {
             Ok(segment) => (match segment.next_segment { 0 => None, s => Some(s) },
                             Ok(segment)),
             Err(e) => (None, Err(e))
