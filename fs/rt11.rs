@@ -1,6 +1,6 @@
 // Copyright © 2023 David Caldwell <david@porkrind.org>
 
-use std::{cmp::min, io, io::ErrorKind, fmt::Debug};
+use std::{cmp::min, fmt::Debug, io::{self, ErrorKind}, ops::Range};
 
 use anyhow::{Context,anyhow};
 use bytebuffer::{Endian, ByteBuffer};
@@ -56,7 +56,12 @@ impl<B: BlockDevice> RT11FS<B> {
     pub fn mkfs(mut image: B) -> anyhow::Result<RT11FS<B>> {
         let home = HomeBlock::new();
         image.write_blocks(1, 1, &home.repr()?)?;
-        let dir_segment = DirSegment::new(home.directory_start_block, 4, image.blocks() as u16);
+        let segment_count = 4; // This is RT-11's default. Should it be configurable like it is there?
+        let first_data_block = DirSegment::segment_block(home.directory_start_block, segment_count+1);
+        let dir_segment = DirSegment::new(1,
+                                          home.directory_start_block,
+                                          1..segment_count,
+                                          first_data_block..image.blocks() as u16);
         image.write_blocks(home.directory_start_block as usize, 2, &dir_segment.repr()?)?;
         return Self::new(image);
     }
@@ -163,11 +168,14 @@ impl<B: BlockDevice> RT11FS<B> {
         DirEntry::encode_filename(name)?;
         _ = self.delete(name); // Can only fail because file-not-found, which is a no-op here.
         let Some((segment, entry)) = self.find_empty_space(blocks) else { return Err(anyhow!("No space available in image")) };
-        if self.dir[segment].entries.len() + 1 > self.dir[segment].max_entries() {
-            // Too many entries to fit in segment.
-            // We _should_ split the segment here but I don't want to write that yet :-)
-            return Err(anyhow!("No more entries in the segment and splitting segments is not implemented yet!"));
-        }
+        let (segment, entry) =
+            if self.dir[segment].entries.len() + 1 > self.dir[segment].max_entries() {
+                // Too many entries to fit in segment.
+                self.split_directory(segment)?;
+                // The segment we found may have moved so look for it again
+                let Some((segment, entry)) = self.find_empty_space(blocks) else { return Err(anyhow!("No space available in image")) };
+                (segment, entry)
+            } else { (segment, entry) };
         let mut new_free = self.dir[segment].entries[entry].clone();
         self.dir[segment].entries[entry].name = name.to_owned();
         self.dir[segment].entries[entry].length = blocks;
@@ -189,6 +197,30 @@ impl<B: BlockDevice> RT11FS<B> {
         })
     }
 
+    // As per the "RT–11 Volume and File Formats Manual" section 1.1.5
+    fn split_directory(&mut self, segment: usize) -> anyhow::Result<()> {
+        let block_range = self.dir[segment].block_range();
+        let mut new_seg = self.alloc_segment(block_range.end..block_range.end)?;
+        new_seg.next_segment = self.dir[segment].next_segment;
+        self.dir[segment].next_segment = new_seg.segment;
+        let half = self.dir[segment].entries.len()/2;
+        new_seg.entries = self.dir[segment].entries.split_off(half);
+        let blocks: usize = new_seg.entries.iter().map(|e| e.length).sum();
+        new_seg.data_block -= blocks as u16;
+        self.dir.insert(segment+1, new_seg);
+        self.write_directory_segment(segment)?;
+        self.write_directory_segment(segment+1)?;
+        Ok(())
+    }
+
+    fn alloc_segment(&mut self, data_block: Range<u16>) -> anyhow::Result<DirSegment> {
+        // The first dir segment holds the last segment used so we just increment it to allocate a new one
+        if self.dir[0].last_segment == self.dir[0].segments { Err(anyhow!("Out of directory segments"))? };
+        self.dir[0].last_segment += 1;
+        Ok(DirSegment::new(self.dir[0].last_segment, self.home.directory_start_block,
+                           self.dir[0].last_segment..self.dir[0].segments,
+                           data_block))
+    }
 }
 
 impl<B: BlockDevice> FileSystem for RT11FS<B> {
@@ -379,19 +411,17 @@ pub struct DirSegment {
 impl DirSegment {
     pub fn segment_block(seg_start_block: u16, segment: u16) -> u16 { seg_start_block + (segment-1) * 2 }
 
-    // This is for initializing a new set of segments on a blank disk
-    pub fn new(my_block: u16, segments: u16, total_blocks: u16) -> DirSegment {
-        let data_block = my_block + segments * 2;
-        let segments = 4; // This is RT-11's default. Should it be configurable like it is there?
+    pub fn new(segment: u16, seg_start_block: u16, unused_segs: Range<u16>, data_block: Range<u16>) -> DirSegment {
+        let block = DirSegment::segment_block(seg_start_block, segment);
         DirSegment {
-            segment: 1,
-            block: my_block,
-            segments,
+            segment,
+            block,
             next_segment: 0,
-            last_segment:  1,
+            last_segment: unused_segs.start,
+            segments: unused_segs.end,
             extra_bytes: 0,
-            data_block,
-            entries: vec![DirEntry::new_empty(data_block as usize, (total_blocks - data_block) as usize)],
+            data_block: data_block.start,
+            entries: vec![DirEntry::new_empty(data_block.start as usize, (data_block.end - data_block.start) as usize)],
         }
     }
 
@@ -894,5 +924,29 @@ mod test {
         }
         fs.delete("TEST.TXT").expect("delete test.txt");
         assert_eq!(fs.dir[0].entries.len(), 1);
+    }
+
+    #[test]
+    fn test_split_directory_segment() {
+        let dev = TestDev(vec![0;512*200]);
+        let mut fs = RT11FS::mkfs(dev).expect("Create RT-11 FS");
+        for i in 0..75 {
+            let mut f = fs.create(&format!("TEST{i}.TXT"), 512).expect("write test.txt");
+            f.write(&incrementing(256)).expect("write");
+        }
+        for seg in fs.dir.iter() {
+            println!("{:#?}", seg)
+        }
+        assert_eq!(fs.dir.len(), 2);
+        assert_eq!(fs.dir[1].data_block, fs.home.directory_start_block + fs.dir[0].segments*2 + fs.dir[0].max_entries() as u16/2);
+        assert_eq!(fs.dir[0].last_segment, 2);
+        assert_block_eq!(fs.image, 6,
+                         vec![0x04, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x0e, 0x00],
+                         vec![____; 512-10]);
+        assert_block_eq!(fs.image, 8,
+                         vec![0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x31, 0x00],
+                         vec![____; 512-10]);
+        assert_block_eq!(fs.image, 0x0e, incrementing(256), vec![0; 256]); // First file in segment 1
+        assert_block_eq!(fs.image, 0x31, incrementing(256), vec![0; 256]); // First file in segment 2
     }
 }
