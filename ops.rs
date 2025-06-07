@@ -185,13 +185,13 @@ pub fn dump_file(fs: &impl FileSystem, file: &Path, by_sector: bool) -> anyhow::
     Ok(())
 }
 
-pub fn dump_home(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
+pub fn rt11_dump_home(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
     let home = RT11FS::read_homeblock(image)?;
     println!("{:#?}", home);
     Ok(())
 }
 
-pub fn dump_dir(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
+pub fn rt11_dump_dir(image: &Box<dyn BlockDevice>) -> anyhow::Result<()> {
     let segment_start_block = RT11FS::read_homeblock(image).map(|home| home.directory_start_block).unwrap_or(6);
     let mut segment_num: u16 = 1;
 

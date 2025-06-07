@@ -28,8 +28,8 @@ Usage:
   pdpfs [-h] -i <image> mkfs <device-type> <filesystem>
   pdpfs [-h] -i <image> convert <image-type> <dest-file>
   pdpfs [-h] -i <image> dump [--sector] [<file>]
-  pdpfs [-h] -i <image> dump-home
-  pdpfs [-h] -i <image> dump-dir
+  pdpfs [-h] -i <image> rt11 dump-home
+  pdpfs [-h] -i <image> rt11 dump-dir
 
 Options:
   -h --help              Show this screen.
@@ -118,6 +118,7 @@ struct Args {
     cmd_mkfs:         bool,
     cmd_cat:          bool,
     cmd_convert:      bool,
+    cmd_rt11:         bool,
     arg_source_file:  PathBuf,
     arg_dest_file:    PathBuf,
     arg_file:         Option<PathBuf>,
@@ -144,12 +145,12 @@ fn main() -> anyhow::Result<()> {
         return dump(&dev, args.flag_sector);
     }
 
-    if args.cmd_dump_home {
-        return dump_home(&dev);
+    if args.cmd_rt11 && args.cmd_dump_home {
+        return rt11_dump_home(&dev);
     }
 
-    if args.cmd_dump_dir {
-        return dump_dir(&dev);
+    if args.cmd_rt11 && args.cmd_dump_dir {
+        return rt11_dump_dir(&dev);
     }
 
     if args.cmd_convert {
